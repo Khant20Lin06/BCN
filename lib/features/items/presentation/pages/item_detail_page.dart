@@ -1,0 +1,368 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/constants/api_constants.dart';
+import '../../../../core/error/failure.dart';
+import '../controllers/items_controller.dart';
+
+class ItemDetailPage extends ConsumerWidget {
+  const ItemDetailPage({
+    super.key,
+    required this.itemId,
+    this.embedded = false,
+  });
+
+  final String itemId;
+  final bool embedded;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final itemAsync = ref.watch(itemDetailProvider(itemId));
+
+    return itemAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (Object error, StackTrace stackTrace) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(error.toString()),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: () => ref.invalidate(itemDetailProvider(itemId)),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (item) {
+        final String imageUrl = _resolveImageUrl(item.image);
+        final Widget content = SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              if (imageUrl.isNotEmpty) ...<Widget>[
+                Center(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      imageUrl,
+                      width: 128,
+                      height: 128,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, error, stackTrace) => Container(
+                        width: 128,
+                        height: 128,
+                        decoration: BoxDecoration(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest
+                              .withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.broken_image_outlined),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              _ReadOnlyField(
+                label: 'Item Code',
+                value: item.itemCode?.trim().isNotEmpty == true
+                    ? item.itemCode!
+                    : 'Auto-generated',
+              ),
+              const SizedBox(height: 14),
+              _ReadOnlyField(label: 'Item Name', value: item.itemName),
+              const SizedBox(height: 14),
+              _ReadOnlyField(label: 'Item Group', value: item.itemGroup),
+              const SizedBox(height: 14),
+              _ReadOnlyField(label: 'Default UOM', value: item.stockUom),
+              const SizedBox(height: 14),
+              _ReadOnlyField(
+                label: 'Description',
+                value: item.description?.trim().isNotEmpty == true
+                    ? item.description!
+                    : '-',
+                maxLines: 5,
+              ),
+              const SizedBox(height: 14),
+              _ReadOnlyField(
+                label: 'Valuation Rate',
+                value: item.valuationRate?.toString() ?? '-',
+              ),
+              const SizedBox(height: 14),
+              _ReadOnlySwitchField(label: 'Disabled', value: item.disabled),
+              const SizedBox(height: 10),
+              _ReadOnlySwitchField(
+                label: 'Has Variants',
+                value: item.hasVariants,
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push('/items/$itemId/edit'),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () =>
+                          _confirmSoftDelete(context, ref, item.id),
+                      icon: const Icon(Icons.block_outlined),
+                      label: const Text('Soft Delete'),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => _confirmHardDelete(context, ref, item.id),
+                  icon: const Icon(Icons.delete_forever_rounded),
+                  label: const Text('Hard Delete'),
+                ),
+              ),
+            ],
+          ),
+        );
+
+        if (embedded) {
+          return content;
+        }
+
+        return Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+              child: Row(
+                children: <Widget>[
+                  IconButton(
+                    onPressed: () => context.pop(),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Item Detail',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+            Expanded(child: content),
+          ],
+        );
+      },
+    );
+  }
+
+  String _resolveImageUrl(String? path) {
+    final String normalized = (path ?? '').trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      return normalized;
+    }
+    return '${ApiConstants.baseUrl}$normalized';
+  }
+
+  Future<void> _confirmSoftDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Soft Delete Item'),
+          content: const Text('This will set the item to disabled. Continue?'),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => context.pop(true),
+              child: const Text('Confirm'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    final Failure? failure = await ref
+        .read(itemsControllerProvider.notifier)
+        .softDelete(id);
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(failure == null ? 'Item disabled.' : failure.message),
+      ),
+    );
+
+    ref.invalidate(itemDetailProvider(id));
+    if (!embedded) {
+      await ref.read(itemsControllerProvider.notifier).refresh();
+      if (context.mounted) {
+        context.pop();
+      }
+    }
+  }
+
+  Future<void> _confirmHardDelete(
+    BuildContext context,
+    WidgetRef ref,
+    String id,
+  ) async {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Hard Delete Item'),
+          content: const Text(
+            'This action permanently deletes the item. Continue?',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => context.pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => context.pop(true),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) {
+      return;
+    }
+
+    final Failure? failure = await ref
+        .read(itemsControllerProvider.notifier)
+        .hardDelete(id);
+    if (!context.mounted) {
+      return;
+    }
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(failure == null ? 'Item deleted.' : failure.message),
+      ),
+    );
+
+    if (failure == null) {
+      ref.invalidate(itemDetailProvider(id));
+      await ref.read(itemsControllerProvider.notifier).refresh();
+      if (!embedded && context.mounted) {
+        context.pop();
+      }
+    }
+  }
+}
+
+class _ReadOnlyField extends StatelessWidget {
+  const _ReadOnlyField({
+    required this.label,
+    required this.value,
+    this.maxLines = 1,
+  });
+
+  final String label;
+  final String value;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            letterSpacing: 1,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.35,
+            ),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: theme.colorScheme.outlineVariant),
+          ),
+          child: Text(
+            value.isEmpty ? '-' : value,
+            maxLines: maxLines,
+            overflow: maxLines == 1 ? TextOverflow.ellipsis : TextOverflow.clip,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ReadOnlySwitchField extends StatelessWidget {
+  const _ReadOnlySwitchField({required this.label, required this.value});
+
+  final String label;
+  final bool value;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest.withValues(
+          alpha: 0.35,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: <Widget>[
+          Text(
+            label,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const Spacer(),
+          IgnorePointer(
+            child: Switch.adaptive(value: value, onChanged: (_) {}),
+          ),
+        ],
+      ),
+    );
+  }
+}
