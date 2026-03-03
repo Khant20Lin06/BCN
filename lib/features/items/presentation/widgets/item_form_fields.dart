@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 class ItemFormFields extends StatelessWidget {
   const ItemFormFields({
     super.key,
+    required this.itemCodeController,
+    required this.itemCodeReadOnly,
     required this.itemNameController,
     required this.descriptionController,
     required this.valuationRateController,
@@ -18,6 +20,8 @@ class ItemFormFields extends StatelessWidget {
     required this.onHasVariantsChanged,
   });
 
+  final TextEditingController itemCodeController;
+  final bool itemCodeReadOnly;
   final TextEditingController itemNameController;
   final TextEditingController descriptionController;
   final TextEditingController valuationRateController;
@@ -37,6 +41,15 @@ class ItemFormFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        _FieldLabel(label: 'Item Code *'),
+        TextField(
+          controller: itemCodeController,
+          readOnly: itemCodeReadOnly,
+          decoration: InputDecoration(
+            hintText: itemCodeReadOnly ? null : 'Ex: ITEM-0001',
+          ),
+        ),
+        const SizedBox(height: 14),
         _FieldLabel(label: 'Item Name *'),
         TextField(controller: itemNameController),
         const SizedBox(height: 14),

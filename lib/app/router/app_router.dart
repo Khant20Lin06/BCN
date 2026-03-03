@@ -13,6 +13,7 @@ import '../../features/shell/presentation/pages/app_shell_page.dart';
 import '../../features/users/presentation/pages/user_detail_page.dart';
 import '../../features/users/presentation/pages/user_form_page.dart';
 import '../../features/users/presentation/pages/user_list_page.dart';
+import '../../core/storage/secure_storage_service.dart';
 
 final routerRefreshNotifierProvider = Provider<RouterRefreshNotifier>((
   Ref ref,
@@ -40,8 +41,11 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
   return GoRouter(
     initialLocation: authGatePath,
     refreshListenable: refreshNotifier,
-    redirect: (BuildContext context, GoRouterState state) {
+    redirect: (BuildContext context, GoRouterState state) async {
       final AuthState authState = ref.read(authControllerProvider);
+      final SecureStorageService secureStorageService = ref.read(
+        secureStorageServiceProvider,
+      );
       final String location = state.matchedLocation;
       final bool goingLogin = location == loginPath;
       final bool goingAuthGate = location == authGatePath;
@@ -53,6 +57,11 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
 
       final bool authenticated = authState.status == AuthStatus.authenticated;
       if (authenticated) {
+        final session = await secureStorageService.getSession();
+        if (session == null) {
+          ref.read(authControllerProvider.notifier).setUnauthenticated();
+          return goingLogin ? null : loginPath;
+        }
         return (goingLogin || goingAuthGate) ? itemsPath : null;
       }
 

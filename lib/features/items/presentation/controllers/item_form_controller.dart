@@ -120,6 +120,7 @@ class ItemFormController extends StateNotifier<ItemFormState> {
   }
 
   Future<Failure?> submitCreate({
+    required String? itemCode,
     required String itemName,
     required String itemGroup,
     required String stockUom,
@@ -136,6 +137,7 @@ class ItemFormController extends StateNotifier<ItemFormState> {
 
     final result = await _createItemUseCase.execute(
       CreateItemInput(
+        itemCode: itemCode,
         itemName: itemName,
         itemGroup: itemGroup,
         stockUom: stockUom,

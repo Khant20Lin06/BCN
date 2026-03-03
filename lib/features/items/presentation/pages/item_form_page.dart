@@ -24,6 +24,7 @@ class ItemFormPage extends ConsumerStatefulWidget {
 }
 
 class _ItemFormPageState extends ConsumerState<ItemFormPage> {
+  late final TextEditingController _itemCodeController;
   late final TextEditingController _itemNameController;
   late final TextEditingController _descriptionController;
   late final TextEditingController _valuationController;
@@ -42,6 +43,7 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
   @override
   void initState() {
     super.initState();
+    _itemCodeController = TextEditingController();
     _itemNameController = TextEditingController();
     _descriptionController = TextEditingController();
     _valuationController = TextEditingController();
@@ -56,6 +58,7 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
 
   @override
   void dispose() {
+    _itemCodeController.dispose();
     _itemNameController.dispose();
     _descriptionController.dispose();
     _valuationController.dispose();
@@ -68,6 +71,7 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
 
     if (!_hydratedFromItem && state.item != null) {
       _hydratedFromItem = true;
+      _itemCodeController.text = state.item!.itemCode ?? '';
       _itemNameController.text = state.item!.itemName;
       _descriptionController.text = state.item!.description ?? '';
       _valuationController.text = state.item!.valuationRate?.toString() ?? '';
@@ -155,6 +159,8 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
                       ),
                       const SizedBox(height: 14),
                       ItemFormFields(
+                        itemCodeController: _itemCodeController,
+                        itemCodeReadOnly: widget.isEdit,
                         itemNameController: _itemNameController,
                         descriptionController: _descriptionController,
                         valuationRateController: _valuationController,
@@ -206,12 +212,15 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
   }
 
   Future<void> _save() async {
-    if (_itemNameController.text.trim().isEmpty ||
+    if ((!widget.isEdit && _itemCodeController.text.trim().isEmpty) ||
+        _itemNameController.text.trim().isEmpty ||
         (_selectedItemGroup == null || _selectedItemGroup!.isEmpty) ||
         (_selectedUom == null || _selectedUom!.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Item Name, Item Group and UOM are required.'),
+          content: Text(
+            'Item Code, Item Name, Item Group and UOM are required.',
+          ),
         ),
       );
       return;
@@ -276,6 +285,7 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
             valuationRate: valuation,
           )
         : await controller.submitCreate(
+            itemCode: _itemCodeController.text,
             itemName: _itemNameController.text,
             itemGroup: _selectedItemGroup!,
             stockUom: _selectedUom!,

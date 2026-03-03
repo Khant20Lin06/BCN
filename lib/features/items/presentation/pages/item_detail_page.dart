@@ -108,7 +108,7 @@ class ItemDetailPage extends ConsumerWidget {
                 children: <Widget>[
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: () => context.push('/items/$itemId/edit'),
+                      onPressed: () => _openEditForm(context, ref),
                       icon: const Icon(Icons.edit_outlined),
                       label: const Text('Edit'),
                     ),
@@ -175,6 +175,16 @@ class ItemDetailPage extends ConsumerWidget {
       return normalized;
     }
     return '${ApiConstants.baseUrl}$normalized';
+  }
+
+  Future<void> _openEditForm(BuildContext context, WidgetRef ref) async {
+    final bool? didUpdate = await context.push<bool>('/items/$itemId/edit');
+    if (didUpdate != true || !context.mounted) {
+      return;
+    }
+
+    ref.invalidate(itemDetailProvider(itemId));
+    await ref.read(itemsControllerProvider.notifier).refresh();
   }
 
   Future<void> _confirmSoftDelete(

@@ -108,4 +108,11 @@ class AuthController extends StateNotifier<AuthState> {
 
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
+
+  void setUnauthenticated() {
+    if (state.status == AuthStatus.unauthenticated) {
+      return;
+    }
+    state = const AuthState(status: AuthStatus.unauthenticated);
+  }
 }
