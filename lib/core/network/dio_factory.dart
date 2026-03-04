@@ -21,10 +21,7 @@ class DioFactory {
         baseUrl: baseUrl,
         connectTimeout: connectTimeout,
         receiveTimeout: receiveTimeout,
-        headers: <String, String>{
-          'Content-Type': 'application/json',
-          ...?headers,
-        },
+        headers: <String, String>{'Accept': 'application/json', ...?headers},
       ),
     );
 

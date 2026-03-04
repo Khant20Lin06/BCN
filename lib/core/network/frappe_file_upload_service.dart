@@ -71,7 +71,7 @@ class FrappeFileUploadService {
       return await _apiClient.postRaw(
         ApiConstants.uploadFilePath,
         data: firstAttemptData,
-        options: Options(contentType: 'multipart/form-data'),
+        options: Options(contentType: Headers.multipartFormDataContentType),
       );
     } on DioException catch (error) {
       if (error.response?.statusCode != 404) {
@@ -91,7 +91,7 @@ class FrappeFileUploadService {
     return _apiClient.postRaw(
       ApiConstants.uploadFileV2Path,
       data: secondAttemptData,
-      options: Options(contentType: 'multipart/form-data'),
+      options: Options(contentType: Headers.multipartFormDataContentType),
     );
   }
 

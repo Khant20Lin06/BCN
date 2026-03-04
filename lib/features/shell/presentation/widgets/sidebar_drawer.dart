@@ -39,7 +39,7 @@ class SidebarDrawer extends ConsumerWidget {
                     ),
                     const SizedBox(width: 10),
                     const Text(
-                      'ERPNext',
+                      'ERP CORE',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,

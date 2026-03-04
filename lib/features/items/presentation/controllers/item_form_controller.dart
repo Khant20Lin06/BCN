@@ -62,11 +62,13 @@ class ItemFormController extends StateNotifier<ItemFormState> {
     String? itemId,
   }) async {
     try {
+      final bool canAttachToExistingDoc =
+          itemId != null && itemId.trim().isNotEmpty;
       final String fileUrl = await _fileUploadService.uploadImage(
         filePath: filePath,
-        doctype: 'Item',
-        docname: itemId,
-        fieldname: 'image',
+        doctype: canAttachToExistingDoc ? 'Item' : null,
+        docname: canAttachToExistingDoc ? itemId : null,
+        fieldname: canAttachToExistingDoc ? 'image' : null,
       );
       return Right<Failure, String>(fileUrl);
     } catch (error) {

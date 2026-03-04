@@ -197,11 +197,13 @@ class UsersController extends StateNotifier<UsersState> {
     String? userId,
   }) async {
     try {
+      final bool canAttachToExistingDoc =
+          userId != null && userId.trim().isNotEmpty;
       final String fileUrl = await _fileUploadService.uploadImage(
         filePath: filePath,
-        doctype: 'User',
-        docname: userId,
-        fieldname: 'user_image',
+        doctype: canAttachToExistingDoc ? 'User' : null,
+        docname: canAttachToExistingDoc ? userId : null,
+        fieldname: canAttachToExistingDoc ? 'user_image' : null,
       );
       return Right<Failure, String>(fileUrl);
     } catch (error) {
