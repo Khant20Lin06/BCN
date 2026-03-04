@@ -5,6 +5,8 @@ import '../../../../core/network/dio_factory.dart';
 import '../../../../core/network/frappe_api_client.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../../../core/storage/secure_storage_service.dart';
+import '../../../../core/error/failure.dart';
+import '../../../../core/utils/either.dart';
 import '../../data/datasources/auth_local_ds.dart';
 import '../../data/datasources/auth_remote_ds.dart';
 import '../../data/mappers/session_mapper.dart';
@@ -14,6 +16,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/get_session_usecase.dart';
 import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
+import '../../domain/usecases/request_password_reset_usecase.dart';
 import '../state/auth_state.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((Ref ref) {
@@ -43,6 +46,11 @@ final logoutUseCaseProvider = Provider<LogoutUseCase>((Ref ref) {
   return LogoutUseCase(ref.watch(authRepositoryProvider));
 });
 
+final requestPasswordResetUseCaseProvider =
+    Provider<RequestPasswordResetUseCase>((Ref ref) {
+      return RequestPasswordResetUseCase(ref.watch(authRepositoryProvider));
+    });
+
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
   (Ref ref) {
     return AuthController(
@@ -50,6 +58,9 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
       loginUseCase: ref.watch(loginUseCaseProvider),
       getSessionUseCase: ref.watch(getSessionUseCaseProvider),
       logoutUseCase: ref.watch(logoutUseCaseProvider),
+      requestPasswordResetUseCase: ref.watch(
+        requestPasswordResetUseCaseProvider,
+      ),
     )..initialize();
   },
 );
@@ -60,15 +71,18 @@ class AuthController extends StateNotifier<AuthState> {
     required LoginUseCase loginUseCase,
     required GetSessionUseCase getSessionUseCase,
     required LogoutUseCase logoutUseCase,
+    required RequestPasswordResetUseCase requestPasswordResetUseCase,
   }) : _loginUseCase = loginUseCase,
        _getSessionUseCase = getSessionUseCase,
        _logoutUseCase = logoutUseCase,
+       _requestPasswordResetUseCase = requestPasswordResetUseCase,
        super(const AuthState.initial());
 
   final Ref ref;
   final LoginUseCase _loginUseCase;
   final GetSessionUseCase _getSessionUseCase;
   final LogoutUseCase _logoutUseCase;
+  final RequestPasswordResetUseCase _requestPasswordResetUseCase;
 
   Future<void> initialize() async {
     final result = await _getSessionUseCase.execute();
@@ -107,6 +121,17 @@ class AuthController extends StateNotifier<AuthState> {
     await db.clearItems();
 
     state = const AuthState(status: AuthStatus.unauthenticated);
+  }
+
+  Future<Either<Failure, String>> requestPasswordReset(String email) async {
+    final String normalized = email.trim();
+    if (normalized.isEmpty) {
+      return const Left<Failure, String>(
+        ValidationFailure(message: 'Email is required'),
+      );
+    }
+
+    return _requestPasswordResetUseCase.execute(normalized);
   }
 
   void setUnauthenticated() {

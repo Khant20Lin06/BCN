@@ -48,6 +48,18 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
+  Future<Either<Failure, String>> requestPasswordReset(String email) async {
+    try {
+      final String message = await _remoteDataSource.requestPasswordReset(
+        email: email,
+      );
+      return Right<Failure, String>(message);
+    } catch (error) {
+      return Left<Failure, String>(mapExceptionToFailure(error));
+    }
+  }
+
+  @override
   Future<Either<Failure, SessionEntity?>> getSession() async {
     try {
       final SessionEntity? session = await _localDataSource.getSession();

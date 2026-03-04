@@ -4,15 +4,21 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/pages/auth_gate_page.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
 import '../../features/items/presentation/pages/item_detail_page.dart';
 import '../../features/items/presentation/pages/item_form_page.dart';
 import '../../features/items/presentation/pages/item_list_page.dart';
 import '../../features/shell/presentation/pages/app_shell_page.dart';
+import '../../features/customers/presentation/pages/customer_detail_page.dart';
+import '../../features/customers/presentation/pages/customer_form_page.dart';
+import '../../features/customers/presentation/pages/customer_list_page.dart';
+import '../../features/sales_invoices/presentation/pages/sales_invoice_detail_page.dart';
+import '../../features/sales_invoices/presentation/pages/sales_invoice_form_page.dart';
+import '../../features/sales_invoices/presentation/pages/sales_invoice_list_page.dart';
 import '../../features/users/presentation/pages/user_detail_page.dart';
 import '../../features/users/presentation/pages/user_form_page.dart';
-import '../../features/users/presentation/pages/user_list_page.dart';
 import '../../core/storage/secure_storage_service.dart';
 
 final routerRefreshNotifierProvider = Provider<RouterRefreshNotifier>((
@@ -35,8 +41,11 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
   );
   const String authGatePath = '/auth-gate';
   const String loginPath = '/login';
+  const String forgotPasswordPath = '/forgot-password';
   const String itemsPath = '/items';
-  const String usersPath = '/users';
+  const String profilePath = '/profile';
+  const String customersPath = '/customers';
+  const String salesInvoicesPath = '/sales-invoices';
 
   return GoRouter(
     initialLocation: authGatePath,
@@ -48,6 +57,7 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
       );
       final String location = state.matchedLocation;
       final bool goingLogin = location == loginPath;
+      final bool goingForgotPassword = location == forgotPasswordPath;
       final bool goingAuthGate = location == authGatePath;
 
       if (authState.status == AuthStatus.initial ||
@@ -60,12 +70,14 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         final session = await secureStorageService.getSession();
         if (session == null) {
           ref.read(authControllerProvider.notifier).setUnauthenticated();
-          return goingLogin ? null : loginPath;
+          return (goingLogin || goingForgotPassword) ? null : loginPath;
         }
-        return (goingLogin || goingAuthGate) ? itemsPath : null;
+        return (goingLogin || goingAuthGate || goingForgotPassword)
+            ? itemsPath
+            : null;
       }
 
-      return goingLogin ? null : loginPath;
+      return (goingLogin || goingForgotPassword) ? null : loginPath;
     },
     routes: <RouteBase>[
       GoRoute(
@@ -77,6 +89,11 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         path: loginPath,
         builder: (BuildContext context, GoRouterState state) =>
             const LoginPage(),
+      ),
+      GoRoute(
+        path: forgotPasswordPath,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ForgotPasswordPage(),
       ),
       ShellRoute(
         builder: (BuildContext context, GoRouterState state, Widget child) {
@@ -112,27 +129,88 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
             ],
           ),
           GoRoute(
-            path: usersPath,
+            path: profilePath,
+            builder: (BuildContext context, GoRouterState state) {
+              final AuthState authState = ref.read(authControllerProvider);
+              final String username = authState.session?.username.trim() ?? '';
+              if (username.isEmpty) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              return UserDetailPage(userId: username, isProfileMode: true);
+            },
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'edit',
+                builder: (BuildContext context, GoRouterState state) {
+                  final AuthState authState = ref.read(authControllerProvider);
+                  final String username =
+                      authState.session?.username.trim() ?? '';
+                  if (username.isEmpty) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  return UserFormPage(userId: username, isProfileMode: true);
+                },
+              ),
+            ],
+          ),
+          GoRoute(
+            path: customersPath,
             builder: (BuildContext context, GoRouterState state) =>
-                const UserListPage(),
+                const CustomerListPage(),
             routes: <RouteBase>[
               GoRoute(
                 path: 'new',
                 builder: (BuildContext context, GoRouterState state) =>
-                    const UserFormPage(),
+                    const CustomerFormPage(),
               ),
               GoRoute(
                 path: ':id',
                 builder: (BuildContext context, GoRouterState state) {
                   final String id = state.pathParameters['id'] ?? '';
-                  return UserDetailPage(userId: Uri.decodeComponent(id));
+                  return CustomerDetailPage(
+                    customerId: Uri.decodeComponent(id),
+                  );
                 },
                 routes: <RouteBase>[
                   GoRoute(
                     path: 'edit',
                     builder: (BuildContext context, GoRouterState state) {
                       final String id = state.pathParameters['id'] ?? '';
-                      return UserFormPage(userId: Uri.decodeComponent(id));
+                      return CustomerFormPage(
+                        customerId: Uri.decodeComponent(id),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: salesInvoicesPath,
+            builder: (BuildContext context, GoRouterState state) =>
+                const SalesInvoiceListPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'new',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const SalesInvoiceFormPage(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (BuildContext context, GoRouterState state) {
+                  final String id = state.pathParameters['id'] ?? '';
+                  return SalesInvoiceDetailPage(
+                    salesInvoiceId: Uri.decodeComponent(id),
+                  );
+                },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (BuildContext context, GoRouterState state) {
+                      final String id = state.pathParameters['id'] ?? '';
+                      return SalesInvoiceFormPage(
+                        salesInvoiceId: Uri.decodeComponent(id),
+                      );
                     },
                   ),
                 ],

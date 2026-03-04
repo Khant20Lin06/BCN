@@ -6,9 +6,14 @@ import '../../domain/entities/user_entity.dart';
 import '../controllers/users_controller.dart';
 
 class UserDetailPage extends ConsumerWidget {
-  const UserDetailPage({super.key, required this.userId});
+  const UserDetailPage({
+    super.key,
+    required this.userId,
+    this.isProfileMode = false,
+  });
 
   final String userId;
+  final bool isProfileMode;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -47,14 +52,24 @@ class UserDetailPage extends ConsumerWidget {
               child: Row(
                 children: <Widget>[
                   IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.arrow_back_rounded),
+                    onPressed: () {
+                      if (isProfileMode) {
+                        Scaffold.of(context).openDrawer();
+                        return;
+                      }
+                      context.pop();
+                    },
+                    icon: Icon(
+                      isProfileMode
+                          ? Icons.menu_rounded
+                          : Icons.arrow_back_rounded,
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      'User Detail',
-                      style: TextStyle(
+                      isProfileMode ? 'Profile' : 'User Detail',
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w800,
                       ),
@@ -62,7 +77,9 @@ class UserDetailPage extends ConsumerWidget {
                   ),
                   FilledButton.tonalIcon(
                     onPressed: () => context.push(
-                      '/users/${Uri.encodeComponent(user.id)}/edit',
+                      isProfileMode
+                          ? '/profile/edit'
+                          : '/users/${Uri.encodeComponent(user.id)}/edit',
                     ),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Edit'),
@@ -96,15 +113,6 @@ class UserDetailPage extends ConsumerWidget {
                     _ReadOnlyField(label: 'User Type', value: user.userType),
                     const SizedBox(height: 14),
                     _ReadOnlySwitchField(label: 'Enabled', value: user.enabled),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => _confirmDelete(context, ref, user),
-                        icon: const Icon(Icons.delete_forever_rounded),
-                        label: const Text('Delete User'),
-                      ),
-                    ),
                   ],
                 ),
               ),
@@ -113,53 +121,6 @@ class UserDetailPage extends ConsumerWidget {
         );
       },
     );
-  }
-
-  Future<void> _confirmDelete(
-    BuildContext context,
-    WidgetRef ref,
-    UserEntity user,
-  ) async {
-    final bool? confirmed = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Delete User'),
-          content: Text('Delete ${user.displayName}?'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => context.pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => context.pop(true),
-              child: const Text('Delete'),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (confirmed != true || !context.mounted) {
-      return;
-    }
-
-    final failure = await ref
-        .read(usersControllerProvider.notifier)
-        .deleteUser(user.id);
-    if (!context.mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failure == null ? 'User deleted.' : failure.message),
-      ),
-    );
-
-    if (failure == null && context.mounted) {
-      context.pop();
-    }
   }
 }
 

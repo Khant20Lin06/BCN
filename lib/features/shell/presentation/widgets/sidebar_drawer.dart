@@ -1,8 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../auth/presentation/controllers/auth_controller.dart';
+
+final appVersionProvider = FutureProvider<String>((Ref ref) async {
+  final PackageInfo info = await PackageInfo.fromPlatform();
+  return 'APK version - ${info.version}+${info.buildNumber}';
+});
 
 class SidebarDrawer extends ConsumerWidget {
   const SidebarDrawer({super.key});
@@ -10,6 +16,7 @@ class SidebarDrawer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String location = GoRouterState.of(context).uri.path;
+    final AsyncValue<String> versionAsync = ref.watch(appVersionProvider);
 
     return Drawer(
       child: SafeArea(
@@ -60,11 +67,29 @@ class SidebarDrawer extends ConsumerWidget {
               ),
               _NavTile(
                 icon: Icons.people_alt_outlined,
-                title: 'Users',
-                selected: location.startsWith('/users'),
+                title: 'Profile',
+                selected: location.startsWith('/profile'),
                 onTap: () {
                   Navigator.pop(context);
-                  context.go('/users');
+                  context.go('/profile');
+                },
+              ),
+              _NavTile(
+                icon: Icons.groups_2_outlined,
+                title: 'Customers',
+                selected: location.startsWith('/customers'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/customers');
+                },
+              ),
+              _NavTile(
+                icon: Icons.receipt_long_outlined,
+                title: 'Sales Invoice',
+                selected: location.startsWith('/sales-invoices'),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.go('/sales-invoices');
                 },
               ),
               const Spacer(),
@@ -76,6 +101,33 @@ class SidebarDrawer extends ConsumerWidget {
                   Navigator.pop(context);
                   await ref.read(authControllerProvider.notifier).logout();
                 },
+              ),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                child: versionAsync.when(
+                  data: (String version) => Text(
+                    version,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  loading: () => Text(
+                    'APK ...',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  error: (Object error, StackTrace stackTrace) => Text(
+                    'APK -',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),

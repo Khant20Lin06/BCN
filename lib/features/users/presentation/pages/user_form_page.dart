@@ -8,9 +8,10 @@ import 'package:image_picker/image_picker.dart';
 import '../controllers/users_controller.dart';
 
 class UserFormPage extends ConsumerStatefulWidget {
-  const UserFormPage({super.key, this.userId});
+  const UserFormPage({super.key, this.userId, this.isProfileMode = false});
 
   final String? userId;
+  final bool isProfileMode;
 
   bool get isEdit => userId != null;
 
@@ -221,7 +222,9 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  widget.isEdit ? 'Edit User' : 'Create User',
+                  widget.isEdit
+                      ? (widget.isProfileMode ? 'Edit Profile' : 'Edit User')
+                      : 'Create User',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,

@@ -7,8 +7,14 @@ class ApiConstants {
 
   static const String loggedUserPath =
       '/api/method/frappe.auth.get_logged_user';
+  static const String forgotPasswordPath =
+      '/api/method/frappe.core.doctype.user.user.reset_password';
   static const String itemPath = '/api/resource/Item';
   static const String userPath = '/api/resource/User';
+  static const String customerPath = '/api/resource/Customer';
+  static const String salesInvoicePath = '/api/resource/Sales Invoice';
+  static const String customerGroupPath = '/api/resource/Customer Group';
+  static const String territoryPath = '/api/resource/Territory';
   static const String uploadFilePath = '/api/method/upload_file';
   static const String uploadFileV2Path = '/api/v2/method/upload_file';
   static const String itemGroupPath = '/api/resource/Item Group';
@@ -25,6 +31,26 @@ class ApiConstants {
     'disabled',
     'has_variants',
     'valuation_rate',
+    'modified',
+  ];
+
+  static const List<String> customerFields = <String>[
+    'name',
+    'customer_name',
+    'customer_type',
+    'customer_group',
+    'territory',
+    'creation',
+    'modified',
+  ];
+
+  static const List<String> salesInvoiceFields = <String>[
+    'name',
+    'customer',
+    'posting_date',
+    'grand_total',
+    'status',
+    'creation',
     'modified',
   ];
 }

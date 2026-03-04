@@ -7,8 +7,6 @@ import '../../domain/entities/update_item_input.dart';
 import '../../domain/value_objects/item_query.dart';
 import '../dtos/frappe_list_response_dto.dart';
 import '../dtos/item_dto.dart';
-import '../dtos/item_group_dto.dart';
-import '../dtos/uom_dto.dart';
 import '../mappers/item_mapper.dart';
 
 class ItemRemoteDataSource {
@@ -104,34 +102,50 @@ class ItemRemoteDataSource {
   }
 
   Future<List<String>> fetchItemGroups() async {
-    final Map<String, dynamic> json = await _apiClient.get(
-      ApiConstants.itemGroupPath,
-      queryParameters: <String, dynamic>{
-        'fields': jsonEncode(<String>['name']),
-        'order_by': 'name asc',
-        'limit_page_length': 200,
-      },
-    );
-
-    final FrappeListResponseDto response = FrappeListResponseDto.fromJson(json);
-    return response.data
-        .map((Map<String, dynamic> row) => ItemGroupDto.fromJson(row).name)
-        .toList();
+    return _fetchAllNameOptions(ApiConstants.itemGroupPath);
   }
 
   Future<List<String>> fetchUoms() async {
-    final Map<String, dynamic> json = await _apiClient.get(
-      ApiConstants.uomPath,
-      queryParameters: <String, dynamic>{
-        'fields': jsonEncode(<String>['name']),
-        'order_by': 'name asc',
-        'limit_page_length': 200,
-      },
-    );
+    return _fetchAllNameOptions(ApiConstants.uomPath);
+  }
 
-    final FrappeListResponseDto response = FrappeListResponseDto.fromJson(json);
-    return response.data
-        .map((Map<String, dynamic> row) => UomDto.fromJson(row).name)
-        .toList();
+  Future<List<String>> _fetchAllNameOptions(String endpoint) async {
+    const int pageSize = 200;
+    int offset = 0;
+    final Set<String> values = <String>{};
+
+    while (true) {
+      final Map<String, dynamic> json = await _apiClient.get(
+        endpoint,
+        queryParameters: <String, dynamic>{
+          'fields': jsonEncode(<String>['name']),
+          'order_by': 'name asc',
+          'limit_start': offset,
+          'limit_page_length': pageSize,
+        },
+      );
+
+      final FrappeListResponseDto response = FrappeListResponseDto.fromJson(
+        json,
+      );
+      final List<String> batch = response.data
+          .map(
+            (Map<String, dynamic> row) => (row['name'] as String? ?? '').trim(),
+          )
+          .where((String name) => name.isNotEmpty)
+          .toList(growable: false);
+      values.addAll(batch);
+
+      if (batch.length < pageSize) {
+        break;
+      }
+      offset += pageSize;
+    }
+
+    final List<String> sorted = values.toList(growable: false);
+    sorted.sort(
+      (String a, String b) => a.toLowerCase().compareTo(b.toLowerCase()),
+    );
+    return sorted;
   }
 }

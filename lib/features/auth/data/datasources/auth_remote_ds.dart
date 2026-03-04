@@ -52,6 +52,26 @@ class AuthRemoteDataSource {
     return candidate.copyWith(username: username);
   }
 
+  Future<String> requestPasswordReset({required String email}) async {
+    final Response<dynamic> response = await _apiClient.postRaw(
+      ApiConstants.forgotPasswordPath,
+      requireAuth: false,
+      baseUrlOverride: ApiConstants.baseUrl,
+      data: <String, dynamic>{'user': email.trim()},
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+
+    final dynamic payload = response.data;
+    if (payload is Map<String, dynamic>) {
+      final dynamic message = payload['message'];
+      if (message is String && message.trim().isNotEmpty) {
+        return message.trim();
+      }
+    }
+
+    return 'Password reset instructions have been sent to your email.';
+  }
+
   String _toCookieHeader(List<String> setCookies) {
     final List<String> pairs = <String>[];
     for (final String value in setCookies) {
