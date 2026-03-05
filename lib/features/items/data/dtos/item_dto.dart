@@ -12,9 +12,13 @@ class ItemDto {
     required this.stockUom,
     this.image,
     this.description,
+    this.openingStock,
     this.disabled,
     this.hasVariants,
+    this.maintainStock,
+    this.isFixedAsset,
     this.valuationRate,
+    this.standardRate,
     this.modified,
   });
 
@@ -38,13 +42,25 @@ class ItemDto {
 
   final String? description;
 
+  @JsonKey(name: 'opening_stock')
+  final num? openingStock;
+
   final dynamic disabled;
 
   @JsonKey(name: 'has_variants')
   final dynamic hasVariants;
 
+  @JsonKey(name: 'is_stock_item')
+  final dynamic maintainStock;
+
+  @JsonKey(name: 'is_fixed_asset')
+  final dynamic isFixedAsset;
+
   @JsonKey(name: 'valuation_rate')
   final num? valuationRate;
+
+  @JsonKey(name: 'standard_rate')
+  final num? standardRate;
 
   final DateTime? modified;
 

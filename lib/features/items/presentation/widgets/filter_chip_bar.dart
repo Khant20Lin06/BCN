@@ -43,14 +43,14 @@ class FilterChipBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              label: const Text('Enabled'),
+              label: const Text('Active'),
               selected: selectedDisabled == false,
               onSelected: (_) =>
                   onDisabledChanged(selectedDisabled == false ? null : false),
             ),
           ),
           ChoiceChip(
-            label: const Text('Disabled'),
+            label: const Text('Inactive'),
             selected: selectedDisabled == true,
             onSelected: (_) =>
                 onDisabledChanged(selectedDisabled == true ? null : true),

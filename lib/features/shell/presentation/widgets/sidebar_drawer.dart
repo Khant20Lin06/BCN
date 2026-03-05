@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 
 final appVersionProvider = FutureProvider<String>((Ref ref) async {
@@ -17,6 +18,37 @@ class SidebarDrawer extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final String location = GoRouterState.of(context).uri.path;
     final AsyncValue<String> versionAsync = ref.watch(appVersionProvider);
+    final session = ref.watch(authControllerProvider).session;
+    final bool canReadItems = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.read,
+    );
+    final bool canReadProfile = AppPermissionResolver.can(
+      session,
+      AppModule.profile,
+      PermissionAction.read,
+    );
+    final bool canReadCustomers = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.read,
+    );
+    final bool canReadSalesInvoices = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.read,
+    );
+    final bool canReadItemPrices = AppPermissionResolver.can(
+      session,
+      AppModule.itemPrices,
+      PermissionAction.read,
+    );
+    final bool canReadStockBalances = AppPermissionResolver.can(
+      session,
+      AppModule.stockBalances,
+      PermissionAction.read,
+    );
 
     return Drawer(
       child: SafeArea(
@@ -56,42 +88,66 @@ class SidebarDrawer extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              _NavTile(
-                icon: Icons.inventory_2_rounded,
-                title: 'Items',
-                selected: location.startsWith('/items'),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.go('/items');
-                },
-              ),
-              _NavTile(
-                icon: Icons.people_alt_outlined,
-                title: 'Profile',
-                selected: location.startsWith('/profile'),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.go('/profile');
-                },
-              ),
-              _NavTile(
-                icon: Icons.groups_2_outlined,
-                title: 'Customers',
-                selected: location.startsWith('/customers'),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.go('/customers');
-                },
-              ),
-              _NavTile(
-                icon: Icons.receipt_long_outlined,
-                title: 'Sales Invoice',
-                selected: location.startsWith('/sales-invoices'),
-                onTap: () {
-                  Navigator.pop(context);
-                  context.go('/sales-invoices');
-                },
-              ),
+              if (canReadItems)
+                _NavTile(
+                  icon: Icons.inventory_2_rounded,
+                  title: 'Items',
+                  selected: location.startsWith('/items'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/items');
+                  },
+                ),
+              if (canReadProfile)
+                _NavTile(
+                  icon: Icons.people_alt_outlined,
+                  title: 'Profile',
+                  selected: location.startsWith('/profile'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/profile');
+                  },
+                ),
+              if (canReadCustomers)
+                _NavTile(
+                  icon: Icons.groups_2_outlined,
+                  title: 'Customers',
+                  selected: location.startsWith('/customers'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/customers');
+                  },
+                ),
+              if (canReadSalesInvoices)
+                _NavTile(
+                  icon: Icons.receipt_long_outlined,
+                  title: 'Sales Invoice',
+                  selected: location.startsWith('/sales-invoices'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/sales-invoices');
+                  },
+                ),
+              if (canReadItemPrices)
+                _NavTile(
+                  icon: Icons.sell_outlined,
+                  title: 'Item Price',
+                  selected: location.startsWith('/item-prices'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/item-prices');
+                  },
+                ),
+              if (canReadStockBalances)
+                _NavTile(
+                  icon: Icons.warehouse_outlined,
+                  title: 'Stock Balance',
+                  selected: location.startsWith('/stock-balances'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/stock-balances');
+                  },
+                ),
               const Spacer(),
               _NavTile(
                 icon: Icons.logout_rounded,

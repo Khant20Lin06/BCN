@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../domain/entities/item_entity.dart';
+import '../../domain/value_objects/item_query.dart';
 import '../controllers/items_controller.dart';
 import '../state/items_state.dart';
 import '../widgets/filter_chip_bar.dart';
+import '../widgets/item_cart_card.dart';
 import '../widgets/item_list_tile.dart';
 import '../widgets/search_field.dart';
 import 'item_detail_page.dart';
+import 'item_scan_page.dart';
 
 class ItemListPage extends ConsumerStatefulWidget {
   const ItemListPage({super.key});
@@ -45,16 +51,45 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
       return;
     }
 
-    final max = _scrollController.position.maxScrollExtent;
-    final current = _scrollController.position.pixels;
+    final double max = _scrollController.position.maxScrollExtent;
+    final double current = _scrollController.position.pixels;
     if (current >= max - 280) {
       ref.read(itemsControllerProvider.notifier).loadNextPage();
     }
   }
 
+  Future<void> _scanBarcodeOrQr() async {
+    final String? code = await Navigator.of(context).push<String>(
+      MaterialPageRoute<String>(builder: (_) => const ItemScanPage()),
+    );
+    if (!mounted || code == null || code.trim().isEmpty) {
+      return;
+    }
+
+    final String normalized = code.trim();
+    _searchController.text = normalized;
+    ref.read(itemsControllerProvider.notifier).onSearchChanged(normalized);
+  }
+
   @override
   Widget build(BuildContext context) {
     final ItemsState state = ref.watch(itemsControllerProvider);
+    final session = ref.watch(authControllerProvider).session;
+    final bool canRead = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.read,
+    );
+    final bool canCreate = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.create,
+    );
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.write,
+    );
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -62,11 +97,14 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
 
         final Widget listPane = _ListPane(
           state: state,
-          isTablet: isTablet,
           searchController: _searchController,
           scrollController: _scrollController,
           onMenuTap: () => Scaffold.of(context).openDrawer(),
+          onScanTap: _scanBarcodeOrQr,
           onAddTap: () => context.push('/items/new'),
+          canRead: canRead,
+          canCreate: canCreate,
+          canWrite: canWrite,
           onRetry: () =>
               ref.read(itemsControllerProvider.notifier).loadInitial(),
           onRefresh: () => ref.read(itemsControllerProvider.notifier).refresh(),
@@ -78,6 +116,13 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
           onDisabledChanged: (bool? disabled) => ref
               .read(itemsControllerProvider.notifier)
               .onDisabledFilterChanged(disabled),
+          onViewModeChanged: (ItemListViewMode mode) => ref
+              .read(itemsControllerProvider.notifier)
+              .onViewModeChanged(mode),
+          onSortChanged:
+              ({required ItemSortField field, required bool ascending}) => ref
+                  .read(itemsControllerProvider.notifier)
+                  .onSortChanged(field: field, ascending: ascending),
           onSelect: (String id) {
             if (isTablet) {
               ref.read(itemsControllerProvider.notifier).selectItem(id);
@@ -85,7 +130,7 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
               context.push('/items/$id');
             }
           },
-          onStatusChanged: (item, disabled) => ref
+          onStatusChanged: (ItemEntity item, bool disabled) => ref
               .read(itemsControllerProvider.notifier)
               .toggleDisabled(item, disabled),
         );
@@ -94,8 +139,6 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
           return listPane;
         }
 
-        // Tablet gets a split-pane master/detail flow, while mobile keeps
-        // navigation-based detail pages to preserve familiar UX patterns.
         return Row(
           children: <Widget>[
             SizedBox(width: 420, child: listPane),
@@ -122,33 +165,87 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
 class _ListPane extends StatelessWidget {
   const _ListPane({
     required this.state,
-    required this.isTablet,
     required this.searchController,
     required this.scrollController,
     required this.onMenuTap,
+    required this.onScanTap,
     required this.onAddTap,
+    required this.canRead,
+    required this.canCreate,
+    required this.canWrite,
     required this.onRetry,
     required this.onRefresh,
     required this.onSearch,
     required this.onItemGroupChanged,
     required this.onDisabledChanged,
+    required this.onViewModeChanged,
+    required this.onSortChanged,
     required this.onSelect,
     required this.onStatusChanged,
   });
 
   final ItemsState state;
-  final bool isTablet;
   final TextEditingController searchController;
   final ScrollController scrollController;
   final VoidCallback onMenuTap;
+  final Future<void> Function() onScanTap;
   final VoidCallback onAddTap;
+  final bool canRead;
+  final bool canCreate;
+  final bool canWrite;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onSearch;
   final ValueChanged<String?> onItemGroupChanged;
   final ValueChanged<bool?> onDisabledChanged;
+  final ValueChanged<ItemListViewMode> onViewModeChanged;
+  final void Function({required ItemSortField field, required bool ascending})
+  onSortChanged;
   final ValueChanged<String> onSelect;
-  final void Function(dynamic item, bool disabled) onStatusChanged;
+  final void Function(ItemEntity item, bool disabled) onStatusChanged;
+
+  static const List<_SortChoice> _sortChoices = <_SortChoice>[
+    _SortChoice(
+      label: 'Item Name A-Z',
+      field: ItemSortField.itemName,
+      ascending: true,
+    ),
+    _SortChoice(
+      label: 'Item Name Z-A',
+      field: ItemSortField.itemName,
+      ascending: false,
+    ),
+    _SortChoice(
+      label: 'Item Code A-Z',
+      field: ItemSortField.itemCode,
+      ascending: true,
+    ),
+    _SortChoice(
+      label: 'Item Code Z-A',
+      field: ItemSortField.itemCode,
+      ascending: false,
+    ),
+    _SortChoice(
+      label: 'Price Low-High',
+      field: ItemSortField.price,
+      ascending: true,
+    ),
+    _SortChoice(
+      label: 'Price High-Low',
+      field: ItemSortField.price,
+      ascending: false,
+    ),
+    _SortChoice(
+      label: 'Qty Low-High',
+      field: ItemSortField.qty,
+      ascending: true,
+    ),
+    _SortChoice(
+      label: 'Qty High-Low',
+      field: ItemSortField.qty,
+      ascending: false,
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -169,17 +266,88 @@ class _ListPane extends StatelessWidget {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
               ),
-              FilledButton.icon(
-                onPressed: onAddTap,
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
+              IconButton(
+                onPressed: onScanTap,
+                icon: const Icon(Icons.qr_code_scanner_rounded),
+                tooltip: 'Scan Barcode / QR',
               ),
+              const SizedBox(width: 2),
+              if (canCreate)
+                FilledButton.icon(
+                  onPressed: onAddTap,
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add'),
+                ),
             ],
           ),
         ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: SearchField(controller: searchController, onChanged: onSearch),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: SegmentedButton<ItemListViewMode>(
+                  showSelectedIcon: false,
+                  segments: const <ButtonSegment<ItemListViewMode>>[
+                    ButtonSegment<ItemListViewMode>(
+                      value: ItemListViewMode.list,
+                      icon: Icon(Icons.list_rounded),
+                      label: Text('List View'),
+                    ),
+                    ButtonSegment<ItemListViewMode>(
+                      value: ItemListViewMode.cart,
+                      icon: Icon(Icons.grid_view_rounded),
+                      label: Text('Cart View'),
+                    ),
+                  ],
+                  selected: <ItemListViewMode>{state.viewMode},
+                  onSelectionChanged: (Set<ItemListViewMode> values) {
+                    final ItemListViewMode mode = values.first;
+                    onViewModeChanged(mode);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton<_SortChoice>(
+                onSelected: (_SortChoice value) {
+                  onSortChanged(field: value.field, ascending: value.ascending);
+                },
+                itemBuilder: (BuildContext context) => _sortChoices
+                    .map(
+                      (_SortChoice choice) => PopupMenuItem<_SortChoice>(
+                        value: choice,
+                        child: Text(choice.label),
+                      ),
+                    )
+                    .toList(growable: false),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
+                  ),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      const Icon(Icons.swap_vert_rounded),
+                      const SizedBox(width: 6),
+                      Text(_sortLabel(state.query)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 10),
         Padding(
@@ -196,6 +364,16 @@ class _ListPane extends StatelessWidget {
         Expanded(child: _buildBody(context)),
       ],
     );
+  }
+
+  String _sortLabel(ItemQuery query) {
+    for (final _SortChoice choice in _sortChoices) {
+      if (choice.field == query.sortField &&
+          choice.ascending == query.sortAscending) {
+        return choice.label;
+      }
+    }
+    return 'Sort';
   }
 
   Widget _buildBody(BuildContext context) {
@@ -228,6 +406,14 @@ class _ListPane extends StatelessWidget {
       );
     }
 
+    if (state.viewMode == ItemListViewMode.cart) {
+      return _buildCartView();
+    }
+
+    return _buildListView(context);
+  }
+
+  Widget _buildListView(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
       child: ListView.separated(
@@ -248,16 +434,69 @@ class _ListPane extends StatelessWidget {
             );
           }
 
-          final item = state.items[index];
+          final ItemEntity item = state.items[index];
           return ItemListTile(
             item: item,
-            onTap: () => onSelect(item.id),
-            onStatusChanged: (bool disabled) => onStatusChanged(item, disabled),
+            onTap: canRead ? () => onSelect(item.id) : null,
+            onStatusChanged: canWrite
+                ? (bool disabled) => onStatusChanged(item, disabled)
+                : null,
           );
         },
       ),
     );
   }
+
+  Widget _buildCartView() {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: CustomScrollView(
+        controller: scrollController,
+        slivers: <Widget>[
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+            sliver: SliverGrid(
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 220,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 0.72,
+              ),
+              delegate: SliverChildBuilderDelegate((
+                BuildContext context,
+                int index,
+              ) {
+                final ItemEntity item = state.items[index];
+                return ItemCartCard(
+                  item: item,
+                  onTap: canRead ? () => onSelect(item.id) : null,
+                );
+              }, childCount: state.items.length),
+            ),
+          ),
+          if (state.status == ItemsStatus.paginating)
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(12, 0, 12, 20),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SortChoice {
+  const _SortChoice({
+    required this.label,
+    required this.field,
+    required this.ascending,
+  });
+
+  final String label;
+  final ItemSortField field;
+  final bool ascending;
 }
 
 class _PlaceholderDetail extends StatelessWidget {

@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/items_controller.dart';
 
 class ItemDetailPage extends ConsumerWidget {
@@ -19,6 +21,17 @@ class ItemDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final itemAsync = ref.watch(itemDetailProvider(itemId));
+    final session = ref.watch(authControllerProvider).session;
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.write,
+    );
+    final bool canDelete = AppPermissionResolver.can(
+      session,
+      AppModule.items,
+      PermissionAction.delete,
+    );
 
     return itemAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -82,14 +95,11 @@ class ItemDetailPage extends ConsumerWidget {
               const SizedBox(height: 14),
               _ReadOnlyField(label: 'Item Group', value: item.itemGroup),
               const SizedBox(height: 14),
-              _ReadOnlyField(label: 'Default UOM', value: item.stockUom),
+              _ReadOnlyField(label: 'UOM', value: item.stockUom),
               const SizedBox(height: 14),
               _ReadOnlyField(
-                label: 'Description',
-                value: item.description?.trim().isNotEmpty == true
-                    ? item.description!
-                    : '-',
-                maxLines: 5,
+                label: 'Qty (Stock)',
+                value: item.stockQty?.toStringAsFixed(2) ?? '-',
               ),
               const SizedBox(height: 14),
               _ReadOnlyField(
@@ -97,42 +107,64 @@ class ItemDetailPage extends ConsumerWidget {
                 value: item.valuationRate?.toString() ?? '-',
               ),
               const SizedBox(height: 14),
-              _ReadOnlySwitchField(label: 'Disabled', value: item.disabled),
-              const SizedBox(height: 10),
+              _ReadOnlyField(
+                label: 'Standard Rate',
+                value: item.standardRate?.toString() ?? '-',
+              ),
+              const SizedBox(height: 14),
               _ReadOnlySwitchField(
-                label: 'Has Variants',
-                value: item.hasVariants,
+                label: 'Maintain Stock',
+                value: item.maintainStock,
               ),
               const SizedBox(height: 20),
-              Row(
-                children: <Widget>[
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _openEditForm(context, ref),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      onPressed: () =>
-                          _confirmSoftDelete(context, ref, item.id),
-                      icon: const Icon(Icons.block_outlined),
-                      label: const Text('Soft Delete'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: () => _confirmHardDelete(context, ref, item.id),
-                  icon: const Icon(Icons.delete_forever_rounded),
-                  label: const Text('Hard Delete'),
+              if (canWrite || canDelete) ...<Widget>[
+                Row(
+                  children: <Widget>[
+                    if (canWrite)
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openEditForm(context, ref),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Edit'),
+                        ),
+                      ),
+                    if (canWrite) const SizedBox(width: 12),
+                    if (canWrite)
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: () =>
+                              _confirmSoftDelete(context, ref, item.id),
+                          icon: const Icon(Icons.block_outlined),
+                          label: const Text('Soft Delete'),
+                        ),
+                      ),
+                  ],
                 ),
-              ),
+                if (canDelete) const SizedBox(height: 12),
+                if (canDelete)
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () =>
+                          _confirmHardDelete(context, ref, item.id),
+                      icon: const Icon(Icons.delete_forever_rounded),
+                      label: const Text('Hard Delete'),
+                    ),
+                  ),
+              ] else
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest
+                        .withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'You have read-only permission for Item.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
             ],
           ),
         );
@@ -293,15 +325,10 @@ class ItemDetailPage extends ConsumerWidget {
 }
 
 class _ReadOnlyField extends StatelessWidget {
-  const _ReadOnlyField({
-    required this.label,
-    required this.value,
-    this.maxLines = 1,
-  });
+  const _ReadOnlyField({required this.label, required this.value});
 
   final String label;
   final String value;
-  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
@@ -330,8 +357,8 @@ class _ReadOnlyField extends StatelessWidget {
           ),
           child: Text(
             value.isEmpty ? '-' : value,
-            maxLines: maxLines,
-            overflow: maxLines == 1 ? TextOverflow.ellipsis : TextOverflow.clip,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

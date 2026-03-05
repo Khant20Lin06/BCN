@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../permissions/permission_flags.dart';
 import '../../features/auth/domain/entities/session_entity.dart';
 
 final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
@@ -23,6 +24,11 @@ class SecureStorageService {
         'baseUrl': session.baseUrl,
         'username': session.username,
         'cookieHeader': session.cookieHeader,
+        'roles': session.roles,
+        'permissions': session.permissions.map(
+          (String key, PermissionFlags value) =>
+              MapEntry<String, Object?>(key, value.toJson()),
+        ),
       }),
     );
   }
@@ -34,10 +40,34 @@ class SecureStorageService {
     }
 
     final Map<String, dynamic> map = jsonDecode(raw) as Map<String, dynamic>;
+    final List<dynamic> rawRoles =
+        (map['roles'] as List<dynamic>?) ?? const <dynamic>[];
+    final List<String> roles = rawRoles
+        .whereType<String>()
+        .map((String role) => role.trim())
+        .where((String role) => role.isNotEmpty)
+        .toList(growable: false);
+    final Map<String, dynamic> rawPermissions =
+        (map['permissions'] as Map<String, dynamic>?) ??
+        const <String, dynamic>{};
+    final Map<String, PermissionFlags> permissions =
+        <String, PermissionFlags>{};
+    rawPermissions.forEach((String key, dynamic value) {
+      if (value is Map<String, dynamic>) {
+        permissions[key] = PermissionFlags.fromJson(value);
+      } else if (value is Map) {
+        permissions[key] = PermissionFlags.fromJson(
+          Map<String, dynamic>.from(value),
+        );
+      }
+    });
+
     return SessionEntity(
       baseUrl: map['baseUrl'] as String,
       username: map['username'] as String,
       cookieHeader: map['cookieHeader'] as String,
+      roles: roles,
+      permissions: permissions,
     );
   }
 

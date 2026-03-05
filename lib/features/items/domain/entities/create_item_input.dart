@@ -8,7 +8,11 @@ class CreateItemInput {
     this.description,
     this.disabled = false,
     this.hasVariants = false,
+    this.maintainStock = true,
+    this.openingStock,
     this.valuationRate,
+    this.standardRate,
+    this.isFixedAsset = false,
   });
 
   final String? itemCode;
@@ -19,5 +23,9 @@ class CreateItemInput {
   final String? description;
   final bool disabled;
   final bool hasVariants;
+  final bool maintainStock;
+  final double? openingStock;
   final double? valuationRate;
+  final double? standardRate;
+  final bool isFixedAsset;
 }

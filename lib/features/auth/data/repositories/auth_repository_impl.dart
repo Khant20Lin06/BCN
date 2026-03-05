@@ -38,6 +38,8 @@ class AuthRepositoryImpl implements AuthRepository {
         baseUrl: remoteSession.baseUrl,
         username: remoteSession.username,
         cookieHeader: remoteSession.cookieHeader,
+        roles: remoteSession.roles,
+        permissions: remoteSession.permissions,
       );
 
       await _localDataSource.saveSession(session);
@@ -63,7 +65,24 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Either<Failure, SessionEntity?>> getSession() async {
     try {
       final SessionEntity? session = await _localDataSource.getSession();
-      return Right<Failure, SessionEntity?>(session);
+      if (session == null) {
+        return const Right<Failure, SessionEntity?>(null);
+      }
+
+      try {
+        final SessionEntity refreshed = await _remoteDataSource.refreshSession(
+          session,
+        );
+        await _localDataSource.saveSession(refreshed);
+        return Right<Failure, SessionEntity?>(refreshed);
+      } catch (refreshError) {
+        final Failure refreshFailure = mapExceptionToFailure(refreshError);
+        if (refreshFailure is UnauthorizedFailure) {
+          await _localDataSource.clearSession();
+          return const Right<Failure, SessionEntity?>(null);
+        }
+        return Right<Failure, SessionEntity?>(session);
+      }
     } catch (error) {
       return Left<Failure, SessionEntity?>(mapExceptionToFailure(error));
     }

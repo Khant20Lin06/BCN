@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../items/presentation/widgets/search_field.dart';
 import '../../domain/entities/customer_entity.dart';
 import '../controllers/customers_controller.dart';
@@ -38,6 +40,27 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     final CustomersController controller = ref.read(
       customersControllerProvider.notifier,
     );
+    final session = ref.watch(authControllerProvider).session;
+    final bool canRead = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.read,
+    );
+    final bool canCreate = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.create,
+    );
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.write,
+    );
+    final bool canDelete = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.delete,
+    );
 
     return Column(
       children: <Widget>[
@@ -56,11 +79,12 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () => context.push('/customers/new'),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
-              ),
+              if (canCreate)
+                FilledButton.icon(
+                  onPressed: () => context.push('/customers/new'),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add'),
+                ),
             ],
           ),
         ),
@@ -72,12 +96,26 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           ),
         ),
         const SizedBox(height: 10),
-        Expanded(child: _buildBody(context, state)),
+        Expanded(
+          child: _buildBody(
+            context,
+            state,
+            canRead: canRead,
+            canWrite: canWrite,
+            canDelete: canDelete,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildBody(BuildContext context, CustomersState state) {
+  Widget _buildBody(
+    BuildContext context,
+    CustomersState state, {
+    required bool canRead,
+    required bool canWrite,
+    required bool canDelete,
+  }) {
     final CustomersController controller = ref.read(
       customersControllerProvider.notifier,
     );
@@ -132,8 +170,11 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
               horizontal: 8,
               vertical: 4,
             ),
-            onTap: () =>
-                context.push('/customers/${Uri.encodeComponent(customer.id)}'),
+            onTap: canRead
+                ? () => context.push(
+                    '/customers/${Uri.encodeComponent(customer.id)}',
+                  )
+                : null,
             title: Text(
               customer.displayName,
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -143,16 +184,43 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
               child: Text(_subtitle(customer)),
             ),
             trailing: PopupMenuButton<String>(
-              onSelected: (String action) =>
-                  _onAction(context, action, customer),
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(value: 'view', child: Text('View')),
-                const PopupMenuItem<String>(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Text('Delete'),
-                ),
-              ],
+              onSelected: (String action) => _onAction(
+                context,
+                action,
+                customer,
+                canRead: canRead,
+                canWrite: canWrite,
+                canDelete: canDelete,
+              ),
+              itemBuilder: (BuildContext context) {
+                final List<PopupMenuEntry<String>> entries =
+                    <PopupMenuEntry<String>>[];
+                if (canRead) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'view',
+                      child: Text('View'),
+                    ),
+                  );
+                }
+                if (canWrite) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Text('Edit'),
+                    ),
+                  );
+                }
+                if (canDelete) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text('Delete'),
+                    ),
+                  );
+                }
+                return entries;
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -197,17 +265,26 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
   Future<void> _onAction(
     BuildContext context,
     String action,
-    CustomerEntity customer,
-  ) async {
+    CustomerEntity customer, {
+    required bool canRead,
+    required bool canWrite,
+    required bool canDelete,
+  }) async {
     switch (action) {
       case 'view':
-        context.push('/customers/${Uri.encodeComponent(customer.id)}');
+        if (canRead) {
+          context.push('/customers/${Uri.encodeComponent(customer.id)}');
+        }
         return;
       case 'edit':
-        context.push('/customers/${Uri.encodeComponent(customer.id)}/edit');
+        if (canWrite) {
+          context.push('/customers/${Uri.encodeComponent(customer.id)}/edit');
+        }
         return;
       case 'delete':
-        await _confirmDelete(context, customer);
+        if (canDelete) {
+          await _confirmDelete(context, customer);
+        }
         return;
     }
   }

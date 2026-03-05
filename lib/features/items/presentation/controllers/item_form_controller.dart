@@ -130,7 +130,11 @@ class ItemFormController extends StateNotifier<ItemFormState> {
     required String? description,
     required bool disabled,
     required bool hasVariants,
+    required bool maintainStock,
+    required double? openingStock,
     required double? valuationRate,
+    required double? standardRate,
+    required bool isFixedAsset,
   }) async {
     state = state.copyWith(
       status: ItemFormStatus.submitting,
@@ -147,7 +151,11 @@ class ItemFormController extends StateNotifier<ItemFormState> {
         description: description,
         disabled: disabled,
         hasVariants: hasVariants,
+        maintainStock: maintainStock,
+        openingStock: openingStock,
         valuationRate: valuationRate,
+        standardRate: standardRate,
+        isFixedAsset: isFixedAsset,
       ),
     );
 
@@ -178,7 +186,11 @@ class ItemFormController extends StateNotifier<ItemFormState> {
     required String? description,
     required bool disabled,
     required bool hasVariants,
+    required bool maintainStock,
+    required double? openingStock,
     required double? valuationRate,
+    required double? standardRate,
+    required bool isFixedAsset,
   }) async {
     state = state.copyWith(
       status: ItemFormStatus.submitting,
@@ -195,7 +207,11 @@ class ItemFormController extends StateNotifier<ItemFormState> {
         description: description,
         disabled: disabled,
         hasVariants: hasVariants,
+        maintainStock: maintainStock,
+        openingStock: openingStock,
         valuationRate: valuationRate,
+        standardRate: standardRate,
+        isFixedAsset: isFixedAsset,
       ),
     );
 

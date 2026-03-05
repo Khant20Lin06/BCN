@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/customer_entity.dart';
 import '../controllers/customers_controller.dart';
 
@@ -13,6 +15,18 @@ class CustomerDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).session;
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.write,
+    );
+    final bool canDelete = AppPermissionResolver.can(
+      session,
+      AppModule.customers,
+      PermissionAction.delete,
+    );
+
     final AsyncValue<CustomerEntity> customerAsync = ref.watch(
       customerDetailProvider(customerId),
     );
@@ -57,18 +71,19 @@ class CustomerDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final bool? changed = await context.push<bool>(
-                        '/customers/${Uri.encodeComponent(customer.id)}/edit',
-                      );
-                      if (changed == true) {
-                        ref.invalidate(customerDetailProvider(customer.id));
-                      }
-                    },
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit'),
-                  ),
+                  if (canWrite)
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final bool? changed = await context.push<bool>(
+                          '/customers/${Uri.encodeComponent(customer.id)}/edit',
+                        );
+                        if (changed == true) {
+                          ref.invalidate(customerDetailProvider(customer.id));
+                        }
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                    ),
                 ],
               ),
             ),
@@ -110,14 +125,16 @@ class CustomerDetailPage extends ConsumerWidget {
                       value: _formatDate(customer.modified),
                     ),
                     const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => _confirmDelete(context, ref, customer),
-                        icon: const Icon(Icons.delete_forever_rounded),
-                        label: const Text('Delete Customer'),
+                    if (canDelete)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () =>
+                              _confirmDelete(context, ref, customer),
+                          icon: const Icon(Icons.delete_forever_rounded),
+                          label: const Text('Delete Customer'),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

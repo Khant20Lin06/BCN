@@ -6,7 +6,9 @@ import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/pages/auth_gate_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/role_permissions_page.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
+import '../../core/permissions/app_permission_resolver.dart';
 import '../../features/items/presentation/pages/item_detail_page.dart';
 import '../../features/items/presentation/pages/item_form_page.dart';
 import '../../features/items/presentation/pages/item_list_page.dart';
@@ -17,6 +19,12 @@ import '../../features/customers/presentation/pages/customer_list_page.dart';
 import '../../features/sales_invoices/presentation/pages/sales_invoice_detail_page.dart';
 import '../../features/sales_invoices/presentation/pages/sales_invoice_form_page.dart';
 import '../../features/sales_invoices/presentation/pages/sales_invoice_list_page.dart';
+import '../../features/item_prices/presentation/pages/item_price_detail_page.dart';
+import '../../features/item_prices/presentation/pages/item_price_form_page.dart';
+import '../../features/item_prices/presentation/pages/item_price_list_page.dart';
+import '../../features/stock_balances/presentation/pages/stock_balance_detail_page.dart';
+import '../../features/stock_balances/presentation/pages/stock_balance_form_page.dart';
+import '../../features/stock_balances/presentation/pages/stock_balance_list_page.dart';
 import '../../features/users/presentation/pages/user_detail_page.dart';
 import '../../features/users/presentation/pages/user_form_page.dart';
 import '../../core/storage/secure_storage_service.dart';
@@ -46,6 +54,9 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
   const String profilePath = '/profile';
   const String customersPath = '/customers';
   const String salesInvoicesPath = '/sales-invoices';
+  const String itemPricesPath = '/item-prices';
+  const String stockBalancesPath = '/stock-balances';
+  const String rolePermissionsPath = '/role-permissions';
 
   return GoRouter(
     initialLocation: authGatePath,
@@ -67,14 +78,22 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
 
       final bool authenticated = authState.status == AuthStatus.authenticated;
       if (authenticated) {
-        final session = await secureStorageService.getSession();
+        final session =
+            authState.session ?? await secureStorageService.getSession();
         if (session == null) {
           ref.read(authControllerProvider.notifier).setUnauthenticated();
           return (goingLogin || goingForgotPassword) ? null : loginPath;
         }
-        return (goingLogin || goingAuthGate || goingForgotPassword)
-            ? itemsPath
-            : null;
+
+        if (goingLogin || goingAuthGate || goingForgotPassword) {
+          return AppPermissionResolver.firstAllowedHome(session);
+        }
+
+        if (!AppPermissionResolver.canAccessLocation(session, location)) {
+          return AppPermissionResolver.firstAllowedHome(session);
+        }
+
+        return null;
       }
 
       return (goingLogin || goingForgotPassword) ? null : loginPath;
@@ -101,7 +120,7 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         },
         routes: <RouteBase>[
           GoRoute(
-            path: '/items',
+            path: itemsPath,
             builder: (BuildContext context, GoRouterState state) =>
                 const ItemListPage(),
             routes: <RouteBase>[
@@ -216,6 +235,75 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
                 ],
               ),
             ],
+          ),
+          GoRoute(
+            path: itemPricesPath,
+            builder: (BuildContext context, GoRouterState state) =>
+                const ItemPriceListPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'new',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ItemPriceFormPage(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (BuildContext context, GoRouterState state) {
+                  final String id = state.pathParameters['id'] ?? '';
+                  return ItemPriceDetailPage(
+                    itemPriceId: Uri.decodeComponent(id),
+                  );
+                },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (BuildContext context, GoRouterState state) {
+                      final String id = state.pathParameters['id'] ?? '';
+                      return ItemPriceFormPage(
+                        itemPriceId: Uri.decodeComponent(id),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: stockBalancesPath,
+            builder: (BuildContext context, GoRouterState state) =>
+                const StockBalanceListPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'new',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const StockBalanceFormPage(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (BuildContext context, GoRouterState state) {
+                  final String id = state.pathParameters['id'] ?? '';
+                  return StockBalanceDetailPage(
+                    stockBalanceId: Uri.decodeComponent(id),
+                  );
+                },
+                routes: <RouteBase>[
+                  GoRoute(
+                    path: 'edit',
+                    builder: (BuildContext context, GoRouterState state) {
+                      final String id = state.pathParameters['id'] ?? '';
+                      return StockBalanceFormPage(
+                        stockBalanceId: Uri.decodeComponent(id),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+          GoRoute(
+            path: rolePermissionsPath,
+            builder: (BuildContext context, GoRouterState state) =>
+                const RolePermissionsPage(),
           ),
         ],
       ),

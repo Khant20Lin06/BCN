@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../items/presentation/widgets/search_field.dart';
 import '../../domain/entities/sales_invoice_entity.dart';
 import '../controllers/sales_invoices_controller.dart';
@@ -40,6 +42,27 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
     final SalesInvoicesController controller = ref.read(
       salesInvoicesControllerProvider.notifier,
     );
+    final session = ref.watch(authControllerProvider).session;
+    final bool canRead = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.read,
+    );
+    final bool canCreate = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.create,
+    );
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.write,
+    );
+    final bool canDelete = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.delete,
+    );
 
     return Column(
       children: <Widget>[
@@ -58,11 +81,12 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                 ),
               ),
-              FilledButton.icon(
-                onPressed: () => context.push('/sales-invoices/new'),
-                icon: const Icon(Icons.add_rounded),
-                label: const Text('Add'),
-              ),
+              if (canCreate)
+                FilledButton.icon(
+                  onPressed: () => context.push('/sales-invoices/new'),
+                  icon: const Icon(Icons.add_rounded),
+                  label: const Text('Add'),
+                ),
             ],
           ),
         ),
@@ -74,12 +98,26 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
           ),
         ),
         const SizedBox(height: 10),
-        Expanded(child: _buildBody(context, state)),
+        Expanded(
+          child: _buildBody(
+            context,
+            state,
+            canRead: canRead,
+            canWrite: canWrite,
+            canDelete: canDelete,
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildBody(BuildContext context, SalesInvoicesState state) {
+  Widget _buildBody(
+    BuildContext context,
+    SalesInvoicesState state, {
+    required bool canRead,
+    required bool canWrite,
+    required bool canDelete,
+  }) {
     final SalesInvoicesController controller = ref.read(
       salesInvoicesControllerProvider.notifier,
     );
@@ -143,9 +181,11 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
               horizontal: 8,
               vertical: 4,
             ),
-            onTap: () => context.push(
-              '/sales-invoices/${Uri.encodeComponent(invoice.id)}',
-            ),
+            onTap: canRead
+                ? () => context.push(
+                    '/sales-invoices/${Uri.encodeComponent(invoice.id)}',
+                  )
+                : null,
             title: Text(
               invoice.id,
               style: const TextStyle(fontWeight: FontWeight.w700),
@@ -157,16 +197,43 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
               ),
             ),
             trailing: PopupMenuButton<String>(
-              onSelected: (String action) =>
-                  _onAction(context, action, invoice),
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                const PopupMenuItem<String>(value: 'view', child: Text('View')),
-                const PopupMenuItem<String>(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem<String>(
-                  value: 'delete',
-                  child: Text('Delete'),
-                ),
-              ],
+              onSelected: (String action) => _onAction(
+                context,
+                action,
+                invoice,
+                canRead: canRead,
+                canWrite: canWrite,
+                canDelete: canDelete,
+              ),
+              itemBuilder: (BuildContext context) {
+                final List<PopupMenuEntry<String>> entries =
+                    <PopupMenuEntry<String>>[];
+                if (canRead) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'view',
+                      child: Text('View'),
+                    ),
+                  );
+                }
+                if (canWrite) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'edit',
+                      child: Text('Edit'),
+                    ),
+                  );
+                }
+                if (canDelete) {
+                  entries.add(
+                    const PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Text('Delete'),
+                    ),
+                  );
+                }
+                return entries;
+              },
               child: Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 10,
@@ -194,17 +261,28 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
   Future<void> _onAction(
     BuildContext context,
     String action,
-    SalesInvoiceEntity invoice,
-  ) async {
+    SalesInvoiceEntity invoice, {
+    required bool canRead,
+    required bool canWrite,
+    required bool canDelete,
+  }) async {
     switch (action) {
       case 'view':
-        context.push('/sales-invoices/${Uri.encodeComponent(invoice.id)}');
+        if (canRead) {
+          context.push('/sales-invoices/${Uri.encodeComponent(invoice.id)}');
+        }
         return;
       case 'edit':
-        context.push('/sales-invoices/${Uri.encodeComponent(invoice.id)}/edit');
+        if (canWrite) {
+          context.push(
+            '/sales-invoices/${Uri.encodeComponent(invoice.id)}/edit',
+          );
+        }
         return;
       case 'delete':
-        await _confirmDelete(context, invoice);
+        if (canDelete) {
+          await _confirmDelete(context, invoice);
+        }
         return;
     }
   }

@@ -18,9 +18,13 @@ class ItemMapper {
       stockUom: dto.stockUom,
       image: dto.image,
       description: dto.description,
+      stockQty: dto.openingStock?.toDouble(),
       disabled: _toBool(dto.disabled),
       hasVariants: _toBool(dto.hasVariants),
+      maintainStock: _toBool(dto.maintainStock),
+      isFixedAsset: _toBool(dto.isFixedAsset),
       valuationRate: dto.valuationRate?.toDouble(),
+      standardRate: dto.standardRate?.toDouble(),
       modified: dto.modified,
     );
   }
@@ -34,9 +38,13 @@ class ItemMapper {
       stockUom: item.stockUom,
       image: null,
       description: item.description,
+      openingStock: null,
       disabled: item.disabled,
       hasVariants: item.hasVariants,
+      maintainStock: false,
+      isFixedAsset: false,
       valuationRate: item.valuationRate,
+      standardRate: null,
       modified: item.modified,
     );
   }
@@ -68,7 +76,11 @@ class ItemMapper {
       'description': input.description?.trim(),
       'disabled': input.disabled ? 1 : 0,
       'has_variants': input.hasVariants ? 1 : 0,
+      'is_stock_item': input.maintainStock ? 1 : 0,
+      if (input.openingStock != null) 'opening_stock': input.openingStock,
       if (input.valuationRate != null) 'valuation_rate': input.valuationRate,
+      if (input.standardRate != null) 'standard_rate': input.standardRate,
+      'is_fixed_asset': input.isFixedAsset ? 1 : 0,
     };
   }
 
@@ -81,7 +93,11 @@ class ItemMapper {
       'description': input.description?.trim(),
       'disabled': input.disabled ? 1 : 0,
       'has_variants': input.hasVariants ? 1 : 0,
+      'is_stock_item': input.maintainStock ? 1 : 0,
+      if (input.openingStock != null) 'opening_stock': input.openingStock,
       if (input.valuationRate != null) 'valuation_rate': input.valuationRate,
+      if (input.standardRate != null) 'standard_rate': input.standardRate,
+      'is_fixed_asset': input.isFixedAsset ? 1 : 0,
     };
   }
 

@@ -20,6 +20,7 @@ import '../../domain/usecases/get_uoms_usecase.dart';
 import '../../domain/usecases/hard_delete_item_usecase.dart';
 import '../../domain/usecases/soft_delete_item_usecase.dart';
 import '../../domain/usecases/update_item_usecase.dart';
+import '../../domain/value_objects/item_query.dart';
 import '../state/items_state.dart';
 import '../../../../core/storage/local_database.dart';
 import '../../domain/usecases/get_item_detail_usecase.dart';
@@ -223,6 +224,21 @@ class ItemsController extends StateNotifier<ItemsState> {
     unawaited(loadInitial());
   }
 
+  void onViewModeChanged(ItemListViewMode mode) {
+    state = state.copyWith(viewMode: mode);
+  }
+
+  void onSortChanged({required ItemSortField field, required bool ascending}) {
+    state = state.copyWith(
+      query: state.query.copyWith(
+        sortField: field,
+        sortAscending: ascending,
+        offset: 0,
+      ),
+    );
+    unawaited(loadInitial());
+  }
+
   void selectItem(String? itemId) {
     state = state.copyWith(selectedItemId: itemId);
   }
@@ -237,7 +253,9 @@ class ItemsController extends StateNotifier<ItemsState> {
         description: item.description,
         disabled: nextValue,
         hasVariants: item.hasVariants,
+        maintainStock: item.maintainStock,
         valuationRate: item.valuationRate,
+        standardRate: item.standardRate,
       ),
     );
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/user_entity.dart';
 import '../controllers/users_controller.dart';
 
@@ -17,6 +19,13 @@ class UserDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).session;
+    final bool canWriteProfile = AppPermissionResolver.can(
+      session,
+      AppModule.profile,
+      PermissionAction.write,
+    );
+
     final AsyncValue<UserEntity> userAsync = ref.watch(
       userDetailProvider(userId),
     );
@@ -75,15 +84,16 @@ class UserDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () => context.push(
-                      isProfileMode
-                          ? '/profile/edit'
-                          : '/users/${Uri.encodeComponent(user.id)}/edit',
+                  if (canWriteProfile)
+                    FilledButton.tonalIcon(
+                      onPressed: () => context.push(
+                        isProfileMode
+                            ? '/profile/edit'
+                            : '/users/${Uri.encodeComponent(user.id)}/edit',
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
                     ),
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit'),
-                  ),
                 ],
               ),
             ),

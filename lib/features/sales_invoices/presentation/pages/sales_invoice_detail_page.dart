@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/permissions/app_permission_resolver.dart';
+import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/sales_invoice_entity.dart';
 import '../controllers/sales_invoices_controller.dart';
 
@@ -13,6 +15,18 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(authControllerProvider).session;
+    final bool canWrite = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.write,
+    );
+    final bool canDelete = AppPermissionResolver.can(
+      session,
+      AppModule.salesInvoices,
+      PermissionAction.delete,
+    );
+
     final AsyncValue<SalesInvoiceEntity> invoiceAsync = ref.watch(
       salesInvoiceDetailProvider(salesInvoiceId),
     );
@@ -57,18 +71,21 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  FilledButton.tonalIcon(
-                    onPressed: () async {
-                      final bool? changed = await context.push<bool>(
-                        '/sales-invoices/${Uri.encodeComponent(invoice.id)}/edit',
-                      );
-                      if (changed == true) {
-                        ref.invalidate(salesInvoiceDetailProvider(invoice.id));
-                      }
-                    },
-                    icon: const Icon(Icons.edit_outlined),
-                    label: const Text('Edit'),
-                  ),
+                  if (canWrite)
+                    FilledButton.tonalIcon(
+                      onPressed: () async {
+                        final bool? changed = await context.push<bool>(
+                          '/sales-invoices/${Uri.encodeComponent(invoice.id)}/edit',
+                        );
+                        if (changed == true) {
+                          ref.invalidate(
+                            salesInvoiceDetailProvider(invoice.id),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                    ),
                 ],
               ),
             ),
@@ -104,14 +121,16 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
                       value: _formatDateTime(invoice.modified),
                     ),
                     const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: () => _confirmDelete(context, ref, invoice),
-                        icon: const Icon(Icons.delete_forever_rounded),
-                        label: const Text('Delete Sales Invoice'),
+                    if (canDelete)
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () =>
+                              _confirmDelete(context, ref, invoice),
+                          icon: const Icon(Icons.delete_forever_rounded),
+                          label: const Text('Delete Sales Invoice'),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
