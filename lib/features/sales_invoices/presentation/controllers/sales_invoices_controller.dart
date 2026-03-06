@@ -129,6 +129,64 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     );
   }
 
+  Future<List<String>> fetchCurrencyOptions() async {
+    return _fetchAllFieldOptions(
+      endpoint: ApiConstants.currencyPath,
+      fieldName: 'name',
+      orderBy: 'name asc',
+    );
+  }
+
+  Future<List<String>> fetchPriceListOptions() async {
+    try {
+      return _fetchAllFieldOptions(
+        endpoint: ApiConstants.priceListPath,
+        fieldName: 'name',
+        orderBy: 'name asc',
+        filters: const <List<dynamic>>[
+          <dynamic>['Price List', 'selling', '=', 1],
+          <dynamic>['Price List', 'enabled', '=', 1],
+        ],
+      );
+    } catch (_) {
+      return _fetchAllFieldOptions(
+        endpoint: ApiConstants.priceListPath,
+        fieldName: 'name',
+        orderBy: 'name asc',
+      );
+    }
+  }
+
+  Future<List<String>> fetchWarehouseOptions() async {
+    try {
+      final List<String> leaf = await _fetchAllFieldOptions(
+        endpoint: ApiConstants.warehousePath,
+        fieldName: 'name',
+        orderBy: 'name asc',
+        filters: const <List<dynamic>>[
+          <dynamic>['Warehouse', 'is_group', '=', 0],
+        ],
+      );
+      if (leaf.isNotEmpty) {
+        return leaf;
+      }
+    } catch (_) {
+      // Fallback to unfiltered list below.
+    }
+
+    final List<String> all = await _fetchAllFieldOptions(
+      endpoint: ApiConstants.warehousePath,
+      fieldName: 'name',
+      orderBy: 'name asc',
+    );
+    return all
+        .where(
+          (String name) =>
+              !name.trim().toLowerCase().startsWith('all warehouses'),
+        )
+        .toList(growable: false);
+  }
+
   Future<List<SalesInvoiceItemOption>> fetchItemOptions() async {
     try {
       return _fetchAllItemOptions(
@@ -174,12 +232,19 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     String? salesInvoiceId,
     required String customer,
     required String postingDate,
+    required String currency,
+    required String priceList,
+    String? sourceWarehouse,
     required List<SalesInvoiceLineInput> lines,
   }) async {
     try {
       final String id = (salesInvoiceId ?? '').trim();
+      final String normalizedWarehouse = (sourceWarehouse ?? '').trim();
       final List<Map<String, dynamic>> linePayload = lines
-          .map((SalesInvoiceLineInput line) => line.toPayload())
+          .map(
+            (SalesInvoiceLineInput line) =>
+                line.toPayload(defaultWarehouse: normalizedWarehouse),
+          )
           .toList(growable: false);
 
       final Map<String, dynamic> payload = <String, dynamic>{
@@ -187,6 +252,10 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
         'customer': customer.trim(),
         'posting_date': postingDate.trim(),
         'due_date': postingDate.trim(),
+        'currency': currency.trim(),
+        'selling_price_list': priceList.trim(),
+        if (normalizedWarehouse.isNotEmpty)
+          'set_warehouse': normalizedWarehouse,
         'items': linePayload,
       };
 
@@ -202,17 +271,28 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     required String id,
     required String customer,
     required String postingDate,
+    required String currency,
+    required String priceList,
+    String? sourceWarehouse,
     required List<SalesInvoiceLineInput> lines,
   }) async {
     try {
+      final String normalizedWarehouse = (sourceWarehouse ?? '').trim();
       final List<Map<String, dynamic>> linePayload = lines
-          .map((SalesInvoiceLineInput line) => line.toPayload())
+          .map(
+            (SalesInvoiceLineInput line) =>
+                line.toPayload(defaultWarehouse: normalizedWarehouse),
+          )
           .toList(growable: false);
 
       final Map<String, dynamic> payload = <String, dynamic>{
         'customer': customer.trim(),
         'posting_date': postingDate.trim(),
         'due_date': postingDate.trim(),
+        'currency': currency.trim(),
+        'selling_price_list': priceList.trim(),
+        if (normalizedWarehouse.isNotEmpty)
+          'set_warehouse': normalizedWarehouse,
         'items': linePayload,
       };
 
@@ -240,10 +320,21 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
   }
 
   Failure _toFailure(Object error) {
-    if (error is Failure) {
-      return error;
+    final Failure failure = error is Failure
+        ? error
+        : mapExceptionToFailure(error);
+
+    final String message = failure.message.trim().toLowerCase();
+    if (failure is ServerFailure &&
+        (message.isEmpty ||
+            message == 'server error' ||
+            message.contains('status code of 500'))) {
+      return const ValidationFailure(
+        message:
+            'ERPNext rejected Sales Invoice. Please check customer defaults, item price/rate, receivable account, and tax/company setup.',
+      );
     }
-    return mapExceptionToFailure(error);
+    return failure;
   }
 
   @override
@@ -256,6 +347,7 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     required String endpoint,
     required String fieldName,
     required String orderBy,
+    List<List<dynamic>>? filters,
   }) async {
     const int pageSize = 200;
     int offset = 0;
@@ -269,6 +361,8 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
           'order_by': orderBy,
           'limit_start': offset,
           'limit_page_length': pageSize,
+          if (filters != null && filters.isNotEmpty)
+            'filters': jsonEncode(filters),
         },
       );
 
@@ -366,17 +460,22 @@ class SalesInvoiceLineInput {
     required this.itemCode,
     required this.qty,
     this.rate,
+    this.warehouse,
   });
 
   final String itemCode;
   final double qty;
   final double? rate;
+  final String? warehouse;
 
-  Map<String, dynamic> toPayload() {
+  Map<String, dynamic> toPayload({String? defaultWarehouse}) {
+    final String normalizedWarehouse = (warehouse ?? defaultWarehouse ?? '')
+        .trim();
     return <String, dynamic>{
       'item_code': itemCode.trim(),
       'qty': qty,
       if (rate case final double lineRate) 'rate': lineRate,
+      if (normalizedWarehouse.isNotEmpty) 'warehouse': normalizedWarehouse,
     };
   }
 }
@@ -400,6 +499,9 @@ SalesInvoiceEntity _mapSalesInvoice(Map<String, dynamic> data) {
     id: (data['name'] as String?) ?? '',
     customer: (data['customer'] as String?) ?? '',
     postingDate: _toDate(data['posting_date']),
+    currency: (data['currency'] as String? ?? '').trim(),
+    priceList: (data['selling_price_list'] as String? ?? '').trim(),
+    sourceWarehouse: (data['set_warehouse'] as String? ?? '').trim(),
     grandTotal: _toDouble(data['grand_total']) ?? 0,
     status: (data['status'] as String?) ?? '',
     items: items,

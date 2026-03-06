@@ -18,6 +18,10 @@ class FilterChipBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final TextStyle chipLabelStyle = Theme.of(
+      context,
+    ).textTheme.labelLarge!.copyWith(fontWeight: FontWeight.w700);
+
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
@@ -25,7 +29,7 @@ class FilterChipBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              label: const Text('All'),
+              label: Text('All', style: chipLabelStyle),
               selected: selectedItemGroup == null,
               onSelected: (_) => onItemGroupChanged(null),
             ),
@@ -34,7 +38,7 @@ class FilterChipBar extends StatelessWidget {
             (String group) => Padding(
               padding: const EdgeInsets.only(right: 8),
               child: ChoiceChip(
-                label: Text(group),
+                label: Text(group, style: chipLabelStyle),
                 selected: selectedItemGroup == group,
                 onSelected: (_) => onItemGroupChanged(group),
               ),
@@ -43,14 +47,14 @@ class FilterChipBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: ChoiceChip(
-              label: const Text('Active'),
+              label: Text('Active', style: chipLabelStyle),
               selected: selectedDisabled == false,
               onSelected: (_) =>
                   onDisabledChanged(selectedDisabled == false ? null : false),
             ),
           ),
           ChoiceChip(
-            label: const Text('Inactive'),
+            label: Text('Inactive', style: chipLabelStyle),
             selected: selectedDisabled == true,
             onSelected: (_) =>
                 onDisabledChanged(selectedDisabled == true ? null : true),

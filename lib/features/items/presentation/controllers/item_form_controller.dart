@@ -143,7 +143,7 @@ class ItemFormController extends StateNotifier<ItemFormState> {
 
     final result = await _createItemUseCase.execute(
       CreateItemInput(
-        itemCode: itemCode,
+        itemCode: _resolveItemCode(itemCode: itemCode, itemName: itemName),
         itemName: itemName,
         itemGroup: itemGroup,
         stockUom: stockUom,
@@ -231,5 +231,37 @@ class ItemFormController extends StateNotifier<ItemFormState> {
         return null;
       },
     );
+  }
+
+  String _resolveItemCode({
+    required String? itemCode,
+    required String itemName,
+  }) {
+    final String normalizedCode = (itemCode ?? '').trim();
+    if (normalizedCode.isNotEmpty) {
+      return normalizedCode;
+    }
+
+    final String sanitizedName = itemName
+        .trim()
+        .toUpperCase()
+        .replaceAll(RegExp(r'[^A-Z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+
+    final String prefix = sanitizedName.isEmpty
+        ? 'ITEM'
+        : (sanitizedName.length > 18
+              ? sanitizedName.substring(0, 18)
+              : sanitizedName);
+    final DateTime now = DateTime.now();
+    final String stamp =
+        '${now.year}'
+        '${now.month.toString().padLeft(2, '0')}'
+        '${now.day.toString().padLeft(2, '0')}'
+        '${now.hour.toString().padLeft(2, '0')}'
+        '${now.minute.toString().padLeft(2, '0')}'
+        '${now.second.toString().padLeft(2, '0')}';
+    return '$prefix-$stamp';
   }
 }

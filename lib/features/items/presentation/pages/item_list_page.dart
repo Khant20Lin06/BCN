@@ -85,11 +85,6 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
       AppModule.items,
       PermissionAction.create,
     );
-    final bool canWrite = AppPermissionResolver.can(
-      session,
-      AppModule.items,
-      PermissionAction.write,
-    );
 
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
@@ -104,7 +99,6 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
           onAddTap: () => context.push('/items/new'),
           canRead: canRead,
           canCreate: canCreate,
-          canWrite: canWrite,
           onRetry: () =>
               ref.read(itemsControllerProvider.notifier).loadInitial(),
           onRefresh: () => ref.read(itemsControllerProvider.notifier).refresh(),
@@ -130,9 +124,6 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
               context.push('/items/$id');
             }
           },
-          onStatusChanged: (ItemEntity item, bool disabled) => ref
-              .read(itemsControllerProvider.notifier)
-              .toggleDisabled(item, disabled),
         );
 
         if (!isTablet) {
@@ -172,7 +163,6 @@ class _ListPane extends StatelessWidget {
     required this.onAddTap,
     required this.canRead,
     required this.canCreate,
-    required this.canWrite,
     required this.onRetry,
     required this.onRefresh,
     required this.onSearch,
@@ -181,7 +171,6 @@ class _ListPane extends StatelessWidget {
     required this.onViewModeChanged,
     required this.onSortChanged,
     required this.onSelect,
-    required this.onStatusChanged,
   });
 
   final ItemsState state;
@@ -192,7 +181,6 @@ class _ListPane extends StatelessWidget {
   final VoidCallback onAddTap;
   final bool canRead;
   final bool canCreate;
-  final bool canWrite;
   final VoidCallback onRetry;
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onSearch;
@@ -202,7 +190,6 @@ class _ListPane extends StatelessWidget {
   final void Function({required ItemSortField field, required bool ascending})
   onSortChanged;
   final ValueChanged<String> onSelect;
-  final void Function(ItemEntity item, bool disabled) onStatusChanged;
 
   static const List<_SortChoice> _sortChoices = <_SortChoice>[
     _SortChoice(
@@ -263,15 +250,9 @@ class _ListPane extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Items',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
                 ),
               ),
-              IconButton(
-                onPressed: onScanTap,
-                icon: const Icon(Icons.qr_code_scanner_rounded),
-                tooltip: 'Scan Barcode / QR',
-              ),
-              const SizedBox(width: 2),
               if (canCreate)
                 FilledButton.icon(
                   onPressed: onAddTap,
@@ -282,10 +263,48 @@ class _ListPane extends StatelessWidget {
           ),
         ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: SearchField(controller: searchController, onChanged: onSearch),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+          child: Row(
+            children: <Widget>[
+              IconButton(
+                onPressed: onScanTap,
+                icon: const Icon(Icons.camera_alt_outlined),
+                tooltip: 'Scan Barcode / QR',
+              ),
+              Expanded(
+                child: SearchField(
+                  controller: searchController,
+                  onChanged: onSearch,
+                ),
+              ),
+              const SizedBox(width: 6),
+              PopupMenuButton<_SortChoice>(
+                tooltip: 'Sort',
+                onSelected: (_SortChoice value) {
+                  onSortChanged(field: value.field, ascending: value.ascending);
+                },
+                itemBuilder: (BuildContext context) => _sortChoices
+                    .map(
+                      (_SortChoice choice) => PopupMenuItem<_SortChoice>(
+                        value: choice,
+                        child: Text(choice.label),
+                      ),
+                    )
+                    .toList(growable: false),
+                child: SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: Icon(
+                    Icons.tune_rounded,
+                    size: 22,
+                    color: Theme.of(context).iconTheme.color,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 6),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           child: Row(
@@ -293,6 +312,13 @@ class _ListPane extends StatelessWidget {
               Expanded(
                 child: SegmentedButton<ItemListViewMode>(
                   showSelectedIcon: false,
+                  style: ButtonStyle(
+                    textStyle: WidgetStatePropertyAll<TextStyle?>(
+                      Theme.of(context).textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
                   segments: const <ButtonSegment<ItemListViewMode>>[
                     ButtonSegment<ItemListViewMode>(
                       value: ItemListViewMode.list,
@@ -310,40 +336,6 @@ class _ListPane extends StatelessWidget {
                     final ItemListViewMode mode = values.first;
                     onViewModeChanged(mode);
                   },
-                ),
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<_SortChoice>(
-                onSelected: (_SortChoice value) {
-                  onSortChanged(field: value.field, ascending: value.ascending);
-                },
-                itemBuilder: (BuildContext context) => _sortChoices
-                    .map(
-                      (_SortChoice choice) => PopupMenuItem<_SortChoice>(
-                        value: choice,
-                        child: Text(choice.label),
-                      ),
-                    )
-                    .toList(growable: false),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: Theme.of(context).colorScheme.outlineVariant,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      const Icon(Icons.swap_vert_rounded),
-                      const SizedBox(width: 6),
-                      Text(_sortLabel(state.query)),
-                    ],
-                  ),
                 ),
               ),
             ],
@@ -364,16 +356,6 @@ class _ListPane extends StatelessWidget {
         Expanded(child: _buildBody(context)),
       ],
     );
-  }
-
-  String _sortLabel(ItemQuery query) {
-    for (final _SortChoice choice in _sortChoices) {
-      if (choice.field == query.sortField &&
-          choice.ascending == query.sortAscending) {
-        return choice.label;
-      }
-    }
-    return 'Sort';
   }
 
   Widget _buildBody(BuildContext context) {
@@ -416,16 +398,12 @@ class _ListPane extends StatelessWidget {
   Widget _buildListView(BuildContext context) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView.separated(
+      child: ListView.builder(
         controller: scrollController,
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
         itemCount:
             state.items.length +
             (state.status == ItemsStatus.paginating ? 1 : 0),
-        separatorBuilder: (BuildContext context, int index) => Divider(
-          height: 1,
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
         itemBuilder: (BuildContext context, int index) {
           if (index >= state.items.length) {
             return const Padding(
@@ -438,9 +416,6 @@ class _ListPane extends StatelessWidget {
           return ItemListTile(
             item: item,
             onTap: canRead ? () => onSelect(item.id) : null,
-            onStatusChanged: canWrite
-                ? (bool disabled) => onStatusChanged(item, disabled)
-                : null,
           );
         },
       ),
@@ -460,7 +435,7 @@ class _ListPane extends StatelessWidget {
                 maxCrossAxisExtent: 220,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 0.72,
+                mainAxisExtent: 238,
               ),
               delegate: SliverChildBuilderDelegate((
                 BuildContext context,

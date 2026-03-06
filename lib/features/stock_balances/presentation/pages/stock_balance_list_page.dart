@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
@@ -18,6 +19,8 @@ class StockBalanceListPage extends ConsumerStatefulWidget {
 }
 
 class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
+  static final NumberFormat _quantityFormat = NumberFormat('#,##0.##');
+
   late final TextEditingController _searchController;
 
   @override
@@ -65,36 +68,10 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
 
     return Column(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-          child: Row(
-            children: <Widget>[
-              IconButton(
-                onPressed: () => Scaffold.of(context).openDrawer(),
-                icon: const Icon(Icons.menu_rounded),
-              ),
-              const SizedBox(width: 6),
-              const Expanded(
-                child: Text(
-                  'Stock Balance',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
-                ),
-              ),
-              if (canCreate)
-                FilledButton.icon(
-                  onPressed: () => context.push('/stock-balances/new'),
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add'),
-                ),
-            ],
-          ),
-        ),
+        _buildHeader(context, canCreate: canCreate),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14),
-          child: SearchField(
-            controller: _searchController,
-            onChanged: controller.onSearchChanged,
-          ),
+          child: _buildFilterSection(controller),
         ),
         const SizedBox(height: 10),
         Expanded(
@@ -110,6 +87,51 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
     );
   }
 
+  Widget _buildHeader(BuildContext context, {required bool canCreate}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+      child: Row(
+        children: <Widget>[
+          IconButton(
+            onPressed: () => Scaffold.of(context).openDrawer(),
+            icon: const Icon(Icons.menu_rounded),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              'Stock Balance',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          if (canCreate) ...<Widget>[
+            FilledButton.icon(
+              onPressed: () => context.push('/stock-balances/new'),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 42),
+                textStyle: const TextStyle(fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterSection(StockBalancesController controller) {
+    return SearchField(
+      controller: _searchController,
+      onChanged: controller.onSearchChanged,
+      hintText: 'Search by Item Code, Item Name, Warehouse',
+    );
+  }
+
   Widget _buildBody(
     BuildContext context,
     StockBalancesState state, {
@@ -120,144 +142,166 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
     final StockBalancesController controller = ref.read(
       stockBalancesControllerProvider.notifier,
     );
+    final List<StockBalanceEntity> filteredStockBalances =
+        state.filteredStockBalances;
 
     if (state.status == StockBalancesStatus.loading &&
         state.stockBalances.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return _buildScrollableMessage(
+        context,
+        const CircularProgressIndicator(),
+        onRefresh: controller.loadStockBalances,
+      );
     }
 
     if (state.status == StockBalancesStatus.error &&
         state.stockBalances.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(state.errorMessage ?? 'Failed to load stock balances'),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: controller.loadStockBalances,
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
+      return _buildScrollableMessage(
+        context,
+        Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Text(state.errorMessage ?? 'Failed to load stock balances'),
+            const SizedBox(height: 10),
+            FilledButton(
+              onPressed: controller.loadStockBalances,
+              child: const Text('Retry'),
+            ),
+          ],
         ),
+        onRefresh: controller.loadStockBalances,
       );
     }
 
     if (state.stockBalances.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(24),
-          child: Text('No stock balances found. Tap Add to create one.'),
-        ),
+      return _buildScrollableMessage(
+        context,
+        const Text('No stock balances found.'),
+        onRefresh: controller.loadStockBalances,
+      );
+    }
+
+    if (filteredStockBalances.isEmpty) {
+      return _buildScrollableMessage(
+        context,
+        const Text('No stock balances match the current filters.'),
+        onRefresh: controller.loadStockBalances,
       );
     }
 
     return RefreshIndicator(
       onRefresh: controller.loadStockBalances,
-      child: ListView.separated(
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-        itemCount: state.stockBalances.length,
-        separatorBuilder: (BuildContext context, int index) => Divider(
-          height: 1,
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
+        itemCount: filteredStockBalances.length + 1,
         itemBuilder: (BuildContext context, int index) {
-          final StockBalanceEntity stock = state.stockBalances[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: _TableHeader(
+                headerBackground: Theme.of(context).colorScheme.secondaryContainer,
+                headerForeground: Theme.of(
+                  context,
+                ).colorScheme.onSecondaryContainer,
+              ),
+            );
+          }
+
+          final StockBalanceEntity stock = filteredStockBalances[index - 1];
+          final bool showDivider = index != filteredStockBalances.length;
+          return _StockBalanceRow(
+            stock: stock,
+            quantity: _formatQuantity(stock.actualQty),
+            showDivider: showDivider,
             onTap: canRead
                 ? () => context.push(
                     '/stock-balances/${Uri.encodeComponent(stock.id)}',
                   )
                 : null,
-            title: Text(
-              stock.displayName,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                '${stock.warehouse} | Qty: ${stock.actualQty?.toStringAsFixed(2) ?? '-'} ${stock.uom.trim().isEmpty ? '' : stock.uom}',
-              ),
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (String action) => _onAction(
-                context,
-                action,
-                stock,
-                canRead: canRead,
-                canWrite: canWrite,
-                canDelete: canDelete,
-              ),
-              itemBuilder: (BuildContext context) {
-                final List<PopupMenuEntry<String>> entries =
-                    <PopupMenuEntry<String>>[];
-                if (canRead) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'view',
-                      child: Text('View'),
-                    ),
-                  );
-                }
-                if (canWrite) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'edit',
-                      child: Text('Edit'),
-                    ),
-                  );
-                }
-                if (canDelete) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Text('Delete'),
-                    ),
-                  );
-                }
-                return entries;
-              },
-            ),
+            onLongPress: (canRead || canWrite || canDelete)
+                ? () => _showRowActions(
+                    context,
+                    stock,
+                    canRead: canRead,
+                    canWrite: canWrite,
+                    canDelete: canDelete,
+                  )
+                : null,
           );
         },
       ),
     );
   }
 
-  Future<void> _onAction(
+  Widget _buildScrollableMessage(
     BuildContext context,
-    String action,
+    Widget child, {
+    required Future<void> Function() onRefresh,
+  }) {
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: <Widget>[
+          const SizedBox(height: 90),
+          Center(child: child),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showRowActions(
+    BuildContext context,
     StockBalanceEntity stock, {
     required bool canRead,
     required bool canWrite,
     required bool canDelete,
   }) async {
-    switch (action) {
-      case 'view':
-        if (canRead) {
-          context.push('/stock-balances/${Uri.encodeComponent(stock.id)}');
-        }
-        return;
-      case 'edit':
-        if (canWrite) {
-          context.push('/stock-balances/${Uri.encodeComponent(stock.id)}/edit');
-        }
-        return;
-      case 'delete':
-        if (canDelete) {
-          await _confirmDelete(context, stock);
-        }
-        return;
-    }
+    await showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Wrap(
+            children: <Widget>[
+              if (canRead)
+                ListTile(
+                  leading: const Icon(Icons.visibility_outlined),
+                  title: const Text('View'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    this.context.push(
+                      '/stock-balances/${Uri.encodeComponent(stock.id)}',
+                    );
+                  },
+                ),
+              if (canWrite)
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    this.context.push(
+                      '/stock-balances/${Uri.encodeComponent(stock.id)}/edit',
+                    );
+                  },
+                ),
+              if (canDelete)
+                ListTile(
+                  leading: const Icon(Icons.delete_outline_rounded),
+                  title: const Text('Delete'),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await _confirmDelete(this.context, stock);
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _confirmDelete(
@@ -305,6 +349,202 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
       SnackBar(
         content: Text(
           failure == null ? 'Stock balance deleted.' : failure.message,
+        ),
+      ),
+    );
+  }
+
+  String _formatQuantity(double? value) {
+    if (value == null) {
+      return '-';
+    }
+    return _quantityFormat.format(value);
+  }
+}
+
+class _TableHeader extends StatelessWidget {
+  const _TableHeader({
+    required this.headerBackground,
+    required this.headerForeground,
+  });
+
+  final Color headerBackground;
+  final Color headerForeground;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextStyle? headerStyle = Theme.of(context).textTheme.labelSmall
+        ?.copyWith(
+          color: headerForeground,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.2,
+        );
+
+    return Container(
+      decoration: BoxDecoration(
+        color: headerBackground,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+      child: Row(
+        children: <Widget>[
+          Expanded(
+            flex: 4,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('Item Code', style: headerStyle),
+                Text(
+                  '(Auto-generated)',
+                  style: headerStyle?.copyWith(
+                    color: headerForeground.withValues(alpha: 0.78),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            flex: 5,
+            child: Text('Warehouse', style: headerStyle),
+          ),
+          Expanded(
+            flex: 2,
+            child: Text(
+              'On Hand\nQty',
+              textAlign: TextAlign.right,
+              style: headerStyle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StockBalanceRow extends StatelessWidget {
+  const _StockBalanceRow({
+    required this.stock,
+    required this.quantity,
+    required this.showDivider,
+    this.onTap,
+    this.onLongPress,
+  });
+
+  final StockBalanceEntity stock;
+  final String quantity;
+  final bool showDivider;
+  final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final String itemCode = stock.itemCode.trim().isEmpty ? stock.id : stock.itemCode;
+    final String itemName = stock.itemName.trim().isEmpty ? '-' : stock.itemName.trim();
+    final String warehouse = stock.warehouse.trim().isEmpty ? '-' : stock.warehouse.trim();
+
+    return Material(
+      color: theme.colorScheme.surface,
+      child: InkWell(
+        onTap: onTap,
+        onLongPress: onLongPress,
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(10, 11, 10, 11),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: showDivider
+                    ? theme.colorScheme.outlineVariant
+                    : Colors.transparent,
+              ),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                flex: 4,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      size: 16,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        itemCode,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                flex: 5,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        itemName,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        warehouse,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Expanded(
+                flex: 2,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: <Widget>[
+                    Text(
+                      quantity,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: theme.colorScheme.primary,
+                      ),
+                    ),
+                    if (stock.uom.trim().isNotEmpty)
+                      Text(
+                        stock.uom.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

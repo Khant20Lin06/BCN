@@ -2,104 +2,155 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/constants/api_constants.dart';
 import '../../domain/entities/item_entity.dart';
-import 'status_toggle.dart';
 
 class ItemListTile extends StatelessWidget {
-  const ItemListTile({
-    super.key,
-    required this.item,
-    this.onTap,
-    this.onStatusChanged,
-  });
+  const ItemListTile({super.key, required this.item, this.onTap});
 
   final ItemEntity item;
   final VoidCallback? onTap;
-  final ValueChanged<bool>? onStatusChanged;
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextStyle itemNameStyle = theme.textTheme.titleMedium!.copyWith(
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+    );
+    final TextStyle metaStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w600,
+      letterSpacing: 0.2,
+      height: 1.1,
+    );
+    final TextStyle qtyStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w700,
+      letterSpacing: 0.2,
+    );
+    final TextStyle priceStyle = theme.textTheme.titleMedium!.copyWith(
+      color: const Color(0xFF0D6B61),
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+    );
     final String imageUrl = _resolveImageUrl(item.image);
+    final String itemCode = (item.itemCode ?? '').trim();
+    final String qtyText = item.stockQty == null
+        ? '-'
+        : item.stockQty!.toStringAsFixed(0);
+    final String priceText = item.standardRate == null
+        ? '-'
+        : item.standardRate!.toStringAsFixed(2);
 
     return InkWell(
       borderRadius: BorderRadius.circular(14),
       onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              width: 52,
-              height: 52,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+        ),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final bool compact = constraints.maxWidth < 390;
+            final Widget thumbnail = Container(
+              width: compact ? 52 : 56,
+              height: compact ? 52 : 56,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(12),
+                color: theme.colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.45,
+                ),
+                borderRadius: BorderRadius.circular(10),
               ),
               clipBehavior: Clip.antiAlias,
               child: imageUrl.isEmpty
-                  ? const Icon(Icons.inventory_2_outlined)
+                  ? const Icon(Icons.inventory_2_outlined, size: 24)
                   : Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
                       errorBuilder: (_, error, stackTrace) =>
-                          const Icon(Icons.inventory_2_outlined),
+                          const Icon(Icons.inventory_2_outlined, size: 24),
                     ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            );
+
+            final Widget metaBlock = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  item.itemName,
+                  maxLines: compact ? 2 : 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: itemNameStyle,
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'CODE: ${itemCode.isEmpty ? '-' : itemCode}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: metaStyle,
+                ),
+                Text(
+                  'GROUP: ${item.itemGroup}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: metaStyle,
+                ),
+              ],
+            );
+
+            final Widget qtyPriceBlock = Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text('QTY: $qtyText Units', style: qtyStyle),
+                const SizedBox(height: 4),
+                Text('\$$priceText', style: priceStyle),
+              ],
+            );
+
+            if (compact) {
+              return Column(
                 children: <Widget>[
-                  Text(
-                    item.itemName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '${item.itemGroup} • ${item.stockUom}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if ((item.itemCode ?? '').trim().isNotEmpty) ...<Widget>[
-                    const SizedBox(height: 2),
-                    Text(
-                      'Code: ${item.itemCode}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
-                      _MetaPill(
-                        icon: Icons.sell_outlined,
-                        text:
-                            'Price: ${item.standardRate?.toStringAsFixed(2) ?? '-'}',
-                      ),
-                      _MetaPill(
-                        icon: Icons.inventory_outlined,
-                        text:
-                            'Qty: ${item.stockQty?.toStringAsFixed(2) ?? '-'}',
+                      thumbnail,
+                      const SizedBox(width: 10),
+                      Expanded(child: metaBlock),
+                      const SizedBox(width: 6),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 14,
+                        color: theme.colorScheme.outline,
                       ),
                     ],
                   ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: qtyPriceBlock,
+                  ),
                 ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            StatusToggle(
-              value: !item.disabled,
-              onChanged: onStatusChanged == null
-                  ? null
-                  : (bool enabled) => onStatusChanged!(!enabled),
-            ),
-          ],
+              );
+            }
+
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                thumbnail,
+                const SizedBox(width: 10),
+                Expanded(child: metaBlock),
+                const SizedBox(width: 6),
+                qtyPriceBlock,
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward_ios_rounded,
+                  size: 14,
+                  color: theme.colorScheme.outline,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -114,38 +165,5 @@ class ItemListTile extends StatelessWidget {
       return normalized;
     }
     return '${ApiConstants.baseUrl}$normalized';
-  }
-}
-
-class _MetaPill extends StatelessWidget {
-  const _MetaPill({required this.icon, required this.text});
-
-  final IconData icon;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        color: Theme.of(
-          context,
-        ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 14),
-          const SizedBox(width: 4),
-          Text(
-            text,
-            style: Theme.of(
-              context,
-            ).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
   }
 }

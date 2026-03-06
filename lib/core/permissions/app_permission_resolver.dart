@@ -46,7 +46,7 @@ extension AppModuleX on AppModule {
       case AppModule.profile:
         return '/profile';
       case AppModule.rolePermissions:
-        return '/role-permissions';
+        return '/reports';
     }
   }
 
@@ -103,7 +103,7 @@ class AppPermissionResolver {
 
     final PermissionFlags? mapped = session.permissions[module.key];
     final PermissionFlags? fallback = _fallbackByRole(session.roles, module);
-    if (module == AppModule.profile) {
+    if (module == AppModule.profile || module == AppModule.rolePermissions) {
       final PermissionFlags baseline = const PermissionFlags(read: true);
       PermissionFlags resolved = baseline;
       if (mapped != null) {
@@ -255,8 +255,7 @@ class AppPermissionResolver {
       return const _RoutePermission(AppModule.profile, PermissionAction.read);
     }
 
-    if (location == '/role-permissions' ||
-        location.startsWith('/role-permissions')) {
+    if (location == '/reports' || location.startsWith('/reports')) {
       return const _RoutePermission(
         AppModule.rolePermissions,
         PermissionAction.read,
@@ -368,10 +367,7 @@ class AppPermissionResolver {
       case AppModule.profile:
         return const PermissionFlags(read: true, write: true);
       case AppModule.rolePermissions:
-        if (hasRoleContaining('manager')) {
-          return const PermissionFlags(read: true);
-        }
-        break;
+        return const PermissionFlags(read: true);
     }
     return null;
   }

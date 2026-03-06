@@ -24,15 +24,24 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   late final TextEditingController _nameController;
   late final TextEditingController _customerController;
   late final TextEditingController _postingDateController;
+  late final TextEditingController _currencyController;
+  late final TextEditingController _priceListController;
+  late final TextEditingController _sourceWarehouseController;
   late final TextEditingController _grandTotalController;
   late final TextEditingController _statusController;
 
   List<String> _customerOptions = const <String>[];
+  List<String> _currencyOptions = const <String>[];
+  List<String> _priceListOptions = const <String>[];
+  List<String> _warehouseOptions = const <String>[];
   List<String> _statusOptions = const <String>[];
   List<SalesInvoiceItemOption> _itemOptions = const <SalesInvoiceItemOption>[];
   final List<_SalesInvoiceLineDraft> _lines = <_SalesInvoiceLineDraft>[];
 
   String? _selectedCustomer;
+  String? _selectedCurrency;
+  String? _selectedPriceList;
+  String? _selectedSourceWarehouse;
   String? _selectedStatus;
   bool _loading = false;
   bool _submitting = false;
@@ -44,6 +53,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _nameController = TextEditingController();
     _customerController = TextEditingController();
     _postingDateController = TextEditingController();
+    _currencyController = TextEditingController();
+    _priceListController = TextEditingController();
+    _sourceWarehouseController = TextEditingController();
     _grandTotalController = TextEditingController();
     _statusController = TextEditingController();
 
@@ -60,6 +72,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _nameController.dispose();
     _customerController.dispose();
     _postingDateController.dispose();
+    _currencyController.dispose();
+    _priceListController.dispose();
+    _sourceWarehouseController.dispose();
     _grandTotalController.dispose();
     _statusController.dispose();
     for (final _SalesInvoiceLineDraft line in _lines) {
@@ -75,12 +90,18 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
     String? errorMessage;
     List<String> customerOptions = const <String>[];
+    List<String> currencyOptions = const <String>[];
+    List<String> priceListOptions = const <String>[];
+    List<String> warehouseOptions = const <String>[];
     List<String> statusOptions = const <String>[];
     List<SalesInvoiceItemOption> itemOptions = const <SalesInvoiceItemOption>[];
 
     String id = '';
     String customer = '';
     String postingDate = _postingDateController.text;
+    String currency = '';
+    String priceList = '';
+    String sourceWarehouse = '';
     String grandTotal = '';
     String status = '';
     List<_SalesInvoiceLineDraft> loadedLines = <_SalesInvoiceLineDraft>[
@@ -91,6 +112,24 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       customerOptions = await controller.fetchCustomerOptions();
     } catch (_) {
       customerOptions = const <String>[];
+    }
+
+    try {
+      currencyOptions = await controller.fetchCurrencyOptions();
+    } catch (_) {
+      currencyOptions = const <String>[];
+    }
+
+    try {
+      priceListOptions = await controller.fetchPriceListOptions();
+    } catch (_) {
+      priceListOptions = const <String>[];
+    }
+
+    try {
+      warehouseOptions = await controller.fetchWarehouseOptions();
+    } catch (_) {
+      warehouseOptions = const <String>[];
     }
 
     try {
@@ -111,6 +150,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         postingDate = invoice.postingDate == null
             ? ''
             : DateFormat('yyyy-MM-dd').format(invoice.postingDate!);
+        currency = invoice.currency.trim();
+        priceList = invoice.priceList.trim();
+        sourceWarehouse = invoice.sourceWarehouse.trim();
         grandTotal = invoice.grandTotal.toStringAsFixed(2);
         status = invoice.status.trim();
 
@@ -142,6 +184,18 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       customerOptions,
       customer,
     );
+    final List<String> mergedCurrencyOptions = _mergeWithCurrent(
+      currencyOptions,
+      currency,
+    );
+    final List<String> mergedPriceListOptions = _mergeWithCurrent(
+      priceListOptions,
+      priceList,
+    );
+    final List<String> mergedWarehouseOptions = _mergeWithCurrent(
+      warehouseOptions,
+      sourceWarehouse,
+    );
     final List<String> mergedStatusOptions = _mergeWithCurrent(
       statusOptions,
       status,
@@ -168,6 +222,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         ..addAll(loadedLines);
 
       _customerOptions = mergedCustomerOptions;
+      _currencyOptions = mergedCurrencyOptions;
+      _priceListOptions = mergedPriceListOptions;
+      _warehouseOptions = mergedWarehouseOptions;
       _statusOptions = mergedStatusOptions;
       _itemOptions = itemOptions;
 
@@ -175,6 +232,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         _nameController.text = id;
         _customerController.text = customer;
         _postingDateController.text = postingDate;
+        _currencyController.text = currency;
+        _priceListController.text = priceList;
+        _sourceWarehouseController.text = sourceWarehouse;
         _grandTotalController.text = grandTotal;
         _statusController.text = status;
       }
@@ -187,10 +247,31 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       if (_statusController.text.trim().isEmpty && _statusOptions.isNotEmpty) {
         _statusController.text = _statusOptions.first;
       }
+      if (_currencyController.text.trim().isEmpty &&
+          _currencyOptions.isNotEmpty) {
+        _currencyController.text = _currencyOptions.first;
+      }
+      if (_priceListController.text.trim().isEmpty &&
+          _priceListOptions.isNotEmpty) {
+        _priceListController.text = _priceListOptions.first;
+      }
+      if (_sourceWarehouseController.text.trim().isEmpty &&
+          _warehouseOptions.isNotEmpty) {
+        _sourceWarehouseController.text = _warehouseOptions.first;
+      }
 
       _selectedCustomer = _customerController.text.trim().isEmpty
           ? null
           : _customerController.text.trim();
+      _selectedCurrency = _currencyController.text.trim().isEmpty
+          ? null
+          : _currencyController.text.trim();
+      _selectedPriceList = _priceListController.text.trim().isEmpty
+          ? null
+          : _priceListController.text.trim();
+      _selectedSourceWarehouse = _sourceWarehouseController.text.trim().isEmpty
+          ? null
+          : _sourceWarehouseController.text.trim();
       _selectedStatus = _statusController.text.trim().isEmpty
           ? null
           : _statusController.text.trim();
@@ -307,12 +388,18 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             id: widget.salesInvoiceId!,
             customer: _customerController.text,
             postingDate: _postingDateController.text,
+            currency: _currencyController.text,
+            priceList: _priceListController.text,
+            sourceWarehouse: _sourceWarehouseController.text,
             lines: lines,
           )
         : await controller.createSalesInvoice(
             salesInvoiceId: _nameController.text,
             customer: _customerController.text,
             postingDate: _postingDateController.text,
+            currency: _currencyController.text,
+            priceList: _priceListController.text,
+            sourceWarehouse: _sourceWarehouseController.text,
             lines: lines,
           );
 
@@ -466,6 +553,136 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             return null;
                           },
                         ),
+                        const SizedBox(height: 14),
+                        const _FieldLabel(label: 'Currency *'),
+                        if (_currencyOptions.isNotEmpty)
+                          DropdownButtonFormField<String>(
+                            key: ValueKey<String>(
+                              'currency-${_selectedCurrency ?? ''}-${_currencyOptions.length}',
+                            ),
+                            initialValue: _selectedCurrency,
+                            decoration: const InputDecoration(),
+                            items: _currencyOptions
+                                .map(
+                                  (String value) => DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged: isBusy
+                                ? null
+                                : (String? value) {
+                                    setState(() {
+                                      _selectedCurrency = value;
+                                      _currencyController.text = (value ?? '')
+                                          .trim();
+                                    });
+                                  },
+                            validator: (String? value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Currency is required';
+                              }
+                              return null;
+                            },
+                          )
+                        else
+                          TextFormField(
+                            controller: _currencyController,
+                            decoration: const InputDecoration(
+                              hintText: 'Currency',
+                            ),
+                            validator: (String? value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Currency is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        const SizedBox(height: 14),
+                        const _FieldLabel(label: 'Price List *'),
+                        if (_priceListOptions.isNotEmpty)
+                          DropdownButtonFormField<String>(
+                            key: ValueKey<String>(
+                              'price-list-${_selectedPriceList ?? ''}-${_priceListOptions.length}',
+                            ),
+                            initialValue: _selectedPriceList,
+                            decoration: const InputDecoration(),
+                            items: _priceListOptions
+                                .map(
+                                  (String value) => DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(value),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged: isBusy
+                                ? null
+                                : (String? value) {
+                                    setState(() {
+                                      _selectedPriceList = value;
+                                      _priceListController.text = (value ?? '')
+                                          .trim();
+                                    });
+                                  },
+                            validator: (String? value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Price List is required';
+                              }
+                              return null;
+                            },
+                          )
+                        else
+                          TextFormField(
+                            controller: _priceListController,
+                            decoration: const InputDecoration(
+                              hintText: 'Price List',
+                            ),
+                            validator: (String? value) {
+                              if (value == null || value.trim().isEmpty) {
+                                return 'Price List is required';
+                              }
+                              return null;
+                            },
+                          ),
+                        const SizedBox(height: 14),
+                        const _FieldLabel(label: 'Source Warehouse'),
+                        if (_warehouseOptions.isNotEmpty)
+                          DropdownButtonFormField<String>(
+                            key: ValueKey<String>(
+                              'source-warehouse-${_selectedSourceWarehouse ?? ''}-${_warehouseOptions.length}',
+                            ),
+                            initialValue: _selectedSourceWarehouse,
+                            decoration: const InputDecoration(),
+                            items: _warehouseOptions
+                                .map(
+                                  (String value) => DropdownMenuItem<String>(
+                                    value: value,
+                                    child: Text(
+                                      value,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                )
+                                .toList(growable: false),
+                            onChanged: isBusy
+                                ? null
+                                : (String? value) {
+                                    setState(() {
+                                      _selectedSourceWarehouse = value;
+                                      _sourceWarehouseController.text =
+                                          (value ?? '').trim();
+                                    });
+                                  },
+                          )
+                        else
+                          TextFormField(
+                            controller: _sourceWarehouseController,
+                            decoration: const InputDecoration(
+                              hintText: 'Source Warehouse',
+                            ),
+                          ),
                         const SizedBox(height: 16),
                         Row(
                           children: <Widget>[

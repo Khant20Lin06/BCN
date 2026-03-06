@@ -11,87 +11,121 @@ class ItemCartCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final String imageUrl = _resolveImageUrl(item.image);
     final ThemeData theme = Theme.of(context);
+    final TextStyle chipStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w800,
+      letterSpacing: 0.2,
+    );
+    final TextStyle titleStyle = theme.textTheme.titleSmall!.copyWith(
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+    );
+    final TextStyle metaStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w600,
+      height: 1.15,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+    final TextStyle priceStyle = theme.textTheme.titleMedium!.copyWith(
+      color: const Color(0xFF0D6B61),
+      fontWeight: FontWeight.w900,
+      height: 1.0,
+    );
+    final String imageUrl = _resolveImageUrl(item.image);
+    final String itemCode = (item.itemCode ?? '').trim();
+    final String qtyText = item.stockQty == null
+        ? '-'
+        : item.stockQty!.toStringAsFixed(0);
+    final String priceText = item.standardRate == null
+        ? '-'
+        : item.standardRate!.toStringAsFixed(2);
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: theme.colorScheme.outlineVariant),
           color: theme.colorScheme.surface,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(16),
-                ),
-                child: imageUrl.isEmpty
-                    ? Container(
-                        width: double.infinity,
-                        color: theme.colorScheme.surfaceContainerHighest
-                            .withValues(alpha: 0.35),
-                        child: const Icon(Icons.inventory_2_outlined, size: 34),
-                      )
-                    : Image.network(
-                        imageUrl,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, error, stackTrace) => Container(
-                          width: double.infinity,
-                          color: theme.colorScheme.surfaceContainerHighest
-                              .withValues(alpha: 0.35),
-                          child: const Icon(
-                            Icons.broken_image_outlined,
-                            size: 30,
-                          ),
-                        ),
-                      ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    item.itemName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    (item.itemCode ?? '-').trim().isEmpty
-                        ? '-'
-                        : item.itemCode!.trim(),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Price: ${item.standardRate?.toStringAsFixed(2) ?? '-'}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Qty: ${item.stockQty?.toStringAsFixed(2) ?? '-'}',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
+          boxShadow: const <BoxShadow>[
+            BoxShadow(
+              color: Color(0x11000000),
+              blurRadius: 14,
+              offset: Offset(0, 4),
             ),
           ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Stack(
+                  children: <Widget>[
+                    Container(
+                      width: double.infinity,
+                      height: 130,
+                      color: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.42),
+                      child: imageUrl.isEmpty
+                          ? Icon(
+                              Icons.inventory_2_outlined,
+                              size: 42,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            )
+                          : Image.network(
+                              imageUrl,
+                              width: double.infinity,
+                              height: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, error, stackTrace) => Icon(
+                                Icons.broken_image_outlined,
+                                size: 38,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                    ),
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: _StockChip(
+                        unitsLabel: '$qtyText UNITS',
+                        textStyle: chipStyle,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                item.itemName,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: titleStyle,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                itemCode.isEmpty ? '-' : itemCode,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: metaStyle,
+              ),
+              const SizedBox(height: 1),
+              Text(
+                item.itemGroup,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: metaStyle,
+              ),
+              const SizedBox(height: 4),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text('\$$priceText', style: priceStyle),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -106,5 +140,39 @@ class ItemCartCard extends StatelessWidget {
       return normalized;
     }
     return '${ApiConstants.baseUrl}$normalized';
+  }
+}
+
+class _StockChip extends StatelessWidget {
+  const _StockChip({required this.unitsLabel, required this.textStyle});
+
+  final String unitsLabel;
+  final TextStyle textStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Container(
+            width: 7,
+            height: 7,
+            decoration: const BoxDecoration(
+              color: Color(0xFF2BBE5E),
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 6),
+          Text(unitsLabel, style: textStyle),
+        ],
+      ),
+    );
   }
 }

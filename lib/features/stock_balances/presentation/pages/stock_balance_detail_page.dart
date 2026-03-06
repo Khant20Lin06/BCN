@@ -11,6 +11,8 @@ import '../controllers/stock_balances_controller.dart';
 class StockBalanceDetailPage extends ConsumerWidget {
   const StockBalanceDetailPage({super.key, required this.stockBalanceId});
 
+  static final NumberFormat _numberFormat = NumberFormat('#,##0.##');
+
   final String stockBalanceId;
 
   @override
@@ -103,12 +105,12 @@ class StockBalanceDetailPage extends ConsumerWidget {
                     const SizedBox(height: 14),
                     _ReadOnlyField(
                       label: 'Actual Qty',
-                      value: stock.actualQty?.toStringAsFixed(2) ?? '-',
+                      value: _formatNumber(stock.actualQty),
                     ),
                     const SizedBox(height: 14),
                     _ReadOnlyField(
                       label: 'Valuation Rate',
-                      value: stock.valuationRate?.toStringAsFixed(2) ?? '-',
+                      value: _formatNumber(stock.valuationRate),
                     ),
                     const SizedBox(height: 14),
                     _ReadOnlyField(label: 'UOM', value: stock.uom),
@@ -202,6 +204,13 @@ class StockBalanceDetailPage extends ConsumerWidget {
       return '-';
     }
     return DateFormat('yyyy-MM-dd HH:mm').format(value.toLocal());
+  }
+
+  String _formatNumber(double? value) {
+    if (value == null) {
+      return '-';
+    }
+    return _numberFormat.format(value);
   }
 }
 

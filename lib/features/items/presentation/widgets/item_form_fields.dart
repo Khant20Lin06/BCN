@@ -43,12 +43,12 @@ class ItemFormFields extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _FieldLabel(label: 'Item Code', required: true),
+        const _FieldLabel(label: 'Item Code', required: false),
         TextField(
           controller: itemCodeController,
           readOnly: itemCodeReadOnly,
           decoration: InputDecoration(
-            hintText: itemCodeReadOnly ? null : 'Ex: ITEM-0001',
+            hintText: itemCodeReadOnly ? 'Auto generated' : 'Auto generated',
           ),
         ),
         const SizedBox(height: 12),

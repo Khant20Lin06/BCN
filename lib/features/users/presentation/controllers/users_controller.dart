@@ -24,7 +24,10 @@ final usersApiClientProvider = Provider<FrappeApiClient>((Ref ref) {
 
 final usersControllerProvider =
     StateNotifierProvider<UsersController, UsersState>((Ref ref) {
-      return UsersController(ref.watch(usersApiClientProvider));
+      return UsersController(
+        ref.watch(usersApiClientProvider),
+        ref.watch(secureStorageServiceProvider),
+      );
     });
 
 final userDetailProvider = FutureProvider.family<UserEntity, String>((
@@ -35,7 +38,7 @@ final userDetailProvider = FutureProvider.family<UserEntity, String>((
 });
 
 class UsersController extends StateNotifier<UsersState> {
-  UsersController(this._apiClient)
+  UsersController(this._apiClient, this._storageService)
     : _fileUploadService = FrappeFileUploadService(_apiClient),
       super(const UsersState.initial());
 
@@ -52,6 +55,7 @@ class UsersController extends StateNotifier<UsersState> {
   ];
 
   final FrappeApiClient _apiClient;
+  final SecureStorageService _storageService;
   final FrappeFileUploadService _fileUploadService;
   Timer? _searchDebounce;
 
@@ -108,13 +112,21 @@ class UsersController extends StateNotifier<UsersState> {
   }
 
   Future<UserEntity> getUserDetail(String id) async {
-    final Map<String, dynamic> json = await _apiClient.get(
-      '${ApiConstants.userPath}/${Uri.encodeComponent(id)}',
-      queryParameters: <String, dynamic>{'fields': jsonEncode(_userFields)},
-    );
-    final Map<String, dynamic> data =
-        (json['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
-    return _mapUser(data);
+    try {
+      final Map<String, dynamic> json = await _apiClient.get(
+        '${ApiConstants.userPath}/${Uri.encodeComponent(id)}',
+        queryParameters: <String, dynamic>{'fields': jsonEncode(_userFields)},
+      );
+      final Map<String, dynamic> data =
+          (json['data'] as Map<String, dynamic>?) ?? <String, dynamic>{};
+      return _mapUser(data);
+    } catch (error) {
+      final UserEntity? fallback = await _getSelfProfileFallback(id);
+      if (fallback != null) {
+        return fallback;
+      }
+      throw _toFailure(error);
+    }
   }
 
   Future<Failure?> createUser({
@@ -233,6 +245,96 @@ class UsersController extends StateNotifier<UsersState> {
   void dispose() {
     _searchDebounce?.cancel();
     super.dispose();
+  }
+
+  Future<UserEntity?> _getSelfProfileFallback(String requestedId) async {
+    final session = await _storageService.getSession();
+    if (session == null) {
+      return null;
+    }
+
+    final String normalizedRequested = requestedId.trim().toLowerCase();
+    final String normalizedSession = session.username.trim().toLowerCase();
+    if (normalizedRequested.isNotEmpty &&
+        normalizedRequested != normalizedSession) {
+      return null;
+    }
+
+    try {
+      final Map<String, dynamic> json = await _apiClient.get(
+        '/api/method/frappe.client.get',
+        queryParameters: <String, dynamic>{
+          'doctype': 'User',
+          'name': session.username,
+        },
+      );
+      final dynamic message = json['message'];
+      if (message is Map<String, dynamic>) {
+        return _mapUser(message);
+      }
+    } catch (_) {
+      // Continue to cookie/session fallback.
+    }
+
+    final Map<String, String> cookieMap = _cookieMap(session.cookieHeader);
+    final String email = _decodeCookie(cookieMap['user_id']).isNotEmpty
+        ? _decodeCookie(cookieMap['user_id'])
+        : session.username;
+    final String fullName = _decodeCookie(cookieMap['full_name']);
+    final String userImage = _decodeCookie(cookieMap['user_image']);
+    final List<String> nameParts = fullName
+        .split(RegExp(r'\s+'))
+        .where((String part) => part.trim().isNotEmpty)
+        .toList(growable: false);
+    final String firstName = nameParts.isEmpty ? '' : nameParts.first;
+    final String lastName = nameParts.length <= 1
+        ? ''
+        : nameParts.sublist(1).join(' ');
+    final String username = session.username.contains('@')
+        ? session.username.split('@').first
+        : session.username;
+
+    return UserEntity(
+      id: session.username,
+      fullName: fullName,
+      email: email,
+      enabled: true,
+      userType: 'System User',
+      username: username,
+      firstName: firstName,
+      lastName: lastName,
+      userImage: userImage.isEmpty ? null : userImage,
+    );
+  }
+
+  Map<String, String> _cookieMap(String cookieHeader) {
+    final Map<String, String> values = <String, String>{};
+    for (final String pair in cookieHeader.split(';')) {
+      final String trimmed = pair.trim();
+      if (trimmed.isEmpty || !trimmed.contains('=')) {
+        continue;
+      }
+      final int separator = trimmed.indexOf('=');
+      final String key = trimmed.substring(0, separator).trim();
+      final String value = trimmed.substring(separator + 1).trim();
+      if (key.isEmpty) {
+        continue;
+      }
+      values[key] = value;
+    }
+    return values;
+  }
+
+  String _decodeCookie(String? value) {
+    final String raw = (value ?? '').trim();
+    if (raw.isEmpty) {
+      return '';
+    }
+    try {
+      return Uri.decodeComponent(raw);
+    } catch (_) {
+      return raw;
+    }
   }
 }
 

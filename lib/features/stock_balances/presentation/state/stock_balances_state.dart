@@ -22,6 +22,20 @@ class StockBalancesState {
   final String searchQuery;
   final String? errorMessage;
 
+  List<StockBalanceEntity> get filteredStockBalances {
+    final String normalizedSearch = searchQuery.trim().toLowerCase();
+
+    if (normalizedSearch.isEmpty) {
+      return stockBalances;
+    }
+
+    return stockBalances.where((StockBalanceEntity item) {
+      return item.itemCode.trim().toLowerCase().contains(normalizedSearch) ||
+          item.itemName.trim().toLowerCase().contains(normalizedSearch) ||
+          item.warehouse.trim().toLowerCase().contains(normalizedSearch);
+    }).toList(growable: false);
+  }
+
   StockBalancesState copyWith({
     StockBalancesStatus? status,
     List<StockBalanceEntity>? stockBalances,

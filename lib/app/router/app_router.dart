@@ -6,13 +6,13 @@ import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/pages/auth_gate_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/auth/presentation/pages/role_permissions_page.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
 import '../../core/permissions/app_permission_resolver.dart';
 import '../../features/items/presentation/pages/item_detail_page.dart';
 import '../../features/items/presentation/pages/item_form_page.dart';
 import '../../features/items/presentation/pages/item_list_page.dart';
 import '../../features/shell/presentation/pages/app_shell_page.dart';
+import '../../features/shell/presentation/pages/reports_page.dart';
 import '../../features/customers/presentation/pages/customer_detail_page.dart';
 import '../../features/customers/presentation/pages/customer_form_page.dart';
 import '../../features/customers/presentation/pages/customer_list_page.dart';
@@ -56,7 +56,7 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
   const String salesInvoicesPath = '/sales-invoices';
   const String itemPricesPath = '/item-prices';
   const String stockBalancesPath = '/stock-balances';
-  const String rolePermissionsPath = '/role-permissions';
+  const String reportsPath = '/reports';
 
   return GoRouter(
     initialLocation: authGatePath,
@@ -301,9 +301,9 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
             ],
           ),
           GoRoute(
-            path: rolePermissionsPath,
+            path: reportsPath,
             builder: (BuildContext context, GoRouterState state) =>
-                const RolePermissionsPage(),
+                const ReportsPage(),
           ),
         ],
       ),

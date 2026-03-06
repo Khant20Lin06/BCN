@@ -8,7 +8,7 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 
 final appVersionProvider = FutureProvider<String>((Ref ref) async {
   final PackageInfo info = await PackageInfo.fromPlatform();
-  return 'APK version - ${info.version}+${info.buildNumber}';
+  return 'APK version - ${info.version}';
 });
 
 class SidebarDrawer extends ConsumerWidget {

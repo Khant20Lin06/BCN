@@ -18,6 +18,7 @@ class ApiConstants {
   static const String customerPath = '/api/resource/Customer';
   static const String salesInvoicePath = '/api/resource/Sales Invoice';
   static const String priceListPath = '/api/resource/Price List';
+  static const String currencyPath = '/api/resource/Currency';
   static const String warehousePath = '/api/resource/Warehouse';
   static const String customerGroupPath = '/api/resource/Customer Group';
   static const String territoryPath = '/api/resource/Territory';
@@ -78,6 +79,9 @@ class ApiConstants {
     'name',
     'customer',
     'posting_date',
+    'currency',
+    'selling_price_list',
+    'set_warehouse',
     'grand_total',
     'status',
     'creation',

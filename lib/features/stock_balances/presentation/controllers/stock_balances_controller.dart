@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
@@ -40,7 +39,6 @@ class StockBalancesController extends StateNotifier<StockBalancesState> {
     : super(const StockBalancesState.initial());
 
   final FrappeApiClient _apiClient;
-  Timer? _searchDebounce;
 
   Future<void> loadStockBalances() async {
     state = state.copyWith(
@@ -55,7 +53,6 @@ class StockBalancesController extends StateNotifier<StockBalancesState> {
         queryParameters: <String, dynamic>{
           'order_by': 'modified desc',
           'limit_page_length': 100,
-          ..._searchParams(state.searchQuery),
         },
       );
 
@@ -84,11 +81,7 @@ class StockBalancesController extends StateNotifier<StockBalancesState> {
   }
 
   void onSearchChanged(String value) {
-    _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
-      state = state.copyWith(searchQuery: value.trim());
-      unawaited(loadStockBalances());
-    });
+    state = state.copyWith(searchQuery: value.trim());
   }
 
   Future<StockBalanceEntity> getStockBalanceDetail(String id) async {
@@ -385,12 +378,6 @@ class StockBalancesController extends StateNotifier<StockBalancesState> {
     }
   }
 
-  @override
-  void dispose() {
-    _searchDebounce?.cancel();
-    super.dispose();
-  }
-
   Future<Map<String, dynamic>> _getWithFieldFallback({
     required String path,
     required List<String> fields,
@@ -566,20 +553,6 @@ class StockBalancesController extends StateNotifier<StockBalancesState> {
     } catch (_) {
       return normalized.toLowerCase().startsWith('all warehouses');
     }
-  }
-
-  Map<String, dynamic> _searchParams(String search) {
-    final String value = search.trim();
-    if (value.isEmpty) {
-      return const <String, dynamic>{};
-    }
-    return <String, dynamic>{
-      'or_filters': jsonEncode(<List<dynamic>>[
-        <dynamic>['name', 'like', '%$value%'],
-        <dynamic>['item_code', 'like', '%$value%'],
-        <dynamic>['warehouse', 'like', '%$value%'],
-      ]),
-    };
   }
 
   Future<void> _setQtyViaStockReconciliation({

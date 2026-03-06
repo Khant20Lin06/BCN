@@ -104,6 +104,18 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
                       value: _formatDate(invoice.postingDate),
                     ),
                     const SizedBox(height: 14),
+                    _ReadOnlyField(label: 'Currency', value: invoice.currency),
+                    const SizedBox(height: 14),
+                    _ReadOnlyField(
+                      label: 'Price List',
+                      value: invoice.priceList,
+                    ),
+                    const SizedBox(height: 14),
+                    _ReadOnlyField(
+                      label: 'Source Warehouse',
+                      value: invoice.sourceWarehouse,
+                    ),
+                    const SizedBox(height: 14),
                     _ReadOnlyField(
                       label: 'Grand Total',
                       value: invoice.grandTotal.toStringAsFixed(2),
