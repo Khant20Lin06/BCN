@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/item_price_entity.dart';
@@ -33,20 +34,23 @@ class ItemPriceDetailPage extends ConsumerWidget {
 
     return itemPriceAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object error, StackTrace stackTrace) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(error.toString()),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: () =>
-                    ref.invalidate(itemPriceDetailProvider(itemPriceId)),
-                child: const Text('Retry'),
-              ),
-            ],
+      error: (Object error, StackTrace stackTrace) => AppLoadErrorReporter(
+        message: error.toString(),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(error.toString()),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: () =>
+                      ref.invalidate(itemPriceDetailProvider(itemPriceId)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -185,13 +189,11 @@ class ItemPriceDetailPage extends ConsumerWidget {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failure == null ? 'Item price deleted.' : failure.message,
-        ),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Item price deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
 
     if (failure == null && context.mounted) {
       context.pop();

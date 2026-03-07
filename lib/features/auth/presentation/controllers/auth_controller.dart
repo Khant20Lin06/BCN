@@ -20,16 +20,15 @@ import '../../domain/usecases/request_password_reset_usecase.dart';
 import '../state/auth_state.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((Ref ref) {
+  final secureStorage = ref.watch(secureStorageServiceProvider);
   final FrappeApiClient apiClient = FrappeApiClient(
-    storageService: ref.watch(secureStorageServiceProvider),
+    storageService: secureStorage,
     dioFactory: DioFactory(ref.watch(appLoggerProvider)),
   );
 
   return AuthRepositoryImpl(
-    remoteDataSource: AuthRemoteDataSource(apiClient),
-    localDataSource: AuthLocalDataSource(
-      ref.watch(secureStorageServiceProvider),
-    ),
+    remoteDataSource: AuthRemoteDataSource(apiClient, secureStorage),
+    localDataSource: AuthLocalDataSource(secureStorage),
     mapper: const SessionMapper(),
   );
 });
@@ -134,10 +133,13 @@ class AuthController extends StateNotifier<AuthState> {
     return _requestPasswordResetUseCase.execute(normalized);
   }
 
-  void setUnauthenticated() {
+  void setUnauthenticated({String? message}) {
     if (state.status == AuthStatus.unauthenticated) {
       return;
     }
-    state = const AuthState(status: AuthStatus.unauthenticated);
+    state = AuthState(
+      status: AuthStatus.unauthenticated,
+      errorMessage: message?.trim().isEmpty ?? true ? null : message!.trim(),
+    );
   }
 }

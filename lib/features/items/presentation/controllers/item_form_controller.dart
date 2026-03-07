@@ -162,8 +162,8 @@ class ItemFormController extends StateNotifier<ItemFormState> {
     return result.fold(
       (Failure failure) {
         state = state.copyWith(
-          status: ItemFormStatus.error,
-          errorMessage: failure.message,
+          status: ItemFormStatus.ready,
+          errorMessage: null,
         );
         return failure;
       },
@@ -218,8 +218,8 @@ class ItemFormController extends StateNotifier<ItemFormState> {
     return result.fold(
       (Failure failure) {
         state = state.copyWith(
-          status: ItemFormStatus.error,
-          errorMessage: failure.message,
+          status: ItemFormStatus.ready,
+          errorMessage: null,
         );
         return failure;
       },

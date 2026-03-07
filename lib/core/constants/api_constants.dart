@@ -1,8 +1,6 @@
 class ApiConstants {
   ApiConstants._();
 
-  static const String baseUrl = 'https://bcn-mobile.s.frappe.cloud';
-
   static const int defaultPageSize = 20;
 
   static const String loggedUserPath =
@@ -20,6 +18,7 @@ class ApiConstants {
   static const String priceListPath = '/api/resource/Price List';
   static const String currencyPath = '/api/resource/Currency';
   static const String warehousePath = '/api/resource/Warehouse';
+  static const String modeOfPaymentPath = '/api/resource/Mode of Payment';
   static const String customerGroupPath = '/api/resource/Customer Group';
   static const String territoryPath = '/api/resource/Territory';
   static const String uploadFilePath = '/api/method/upload_file';
@@ -82,6 +81,7 @@ class ApiConstants {
     'currency',
     'selling_price_list',
     'set_warehouse',
+    'is_pos',
     'grand_total',
     'status',
     'creation',

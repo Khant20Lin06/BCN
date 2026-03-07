@@ -40,7 +40,9 @@ final userDetailProvider = FutureProvider.family<UserEntity, String>((
 class UsersController extends StateNotifier<UsersState> {
   UsersController(this._apiClient, this._storageService)
     : _fileUploadService = FrappeFileUploadService(_apiClient),
-      super(const UsersState.initial());
+      super(const UsersState.initial()) {
+    unawaited(_hydrateBaseUrl());
+  }
 
   static const List<String> _userFields = <String>[
     'name',
@@ -58,6 +60,7 @@ class UsersController extends StateNotifier<UsersState> {
   final SecureStorageService _storageService;
   final FrappeFileUploadService _fileUploadService;
   Timer? _searchDebounce;
+  String _baseUrl = '';
 
   Future<void> loadUsers() async {
     state = state.copyWith(status: UsersStatus.loading, errorMessage: null);
@@ -231,7 +234,10 @@ class UsersController extends StateNotifier<UsersState> {
     if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
       return normalized;
     }
-    return '${ApiConstants.baseUrl}$normalized';
+    if (_baseUrl.isEmpty) {
+      return '';
+    }
+    return '$_baseUrl$normalized';
   }
 
   Failure _toFailure(Object error) {
@@ -335,6 +341,17 @@ class UsersController extends StateNotifier<UsersState> {
     } catch (_) {
       return raw;
     }
+  }
+
+  Future<void> _hydrateBaseUrl() async {
+    final String? preferred = await _storageService.getPreferredBaseUrl();
+    if (preferred != null && preferred.isNotEmpty) {
+      _baseUrl = preferred;
+      return;
+    }
+
+    final session = await _storageService.getSession();
+    _baseUrl = session?.baseUrl.trim() ?? '';
   }
 }
 

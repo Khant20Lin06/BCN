@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/sales_invoice_entity.dart';
@@ -33,20 +34,24 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
 
     return invoiceAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object error, StackTrace stackTrace) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(error.toString()),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: () =>
-                    ref.invalidate(salesInvoiceDetailProvider(salesInvoiceId)),
-                child: const Text('Retry'),
-              ),
-            ],
+      error: (Object error, StackTrace stackTrace) => AppLoadErrorReporter(
+        message: error.toString(),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(error.toString()),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: () => ref.invalidate(
+                    salesInvoiceDetailProvider(salesInvoiceId),
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -114,6 +119,23 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
                     _ReadOnlyField(
                       label: 'Source Warehouse',
                       value: invoice.sourceWarehouse,
+                    ),
+                    const SizedBox(height: 14),
+                    _ReadOnlyField(
+                      label: 'Include POS Payment',
+                      value: invoice.isPos ? 'Yes' : 'No',
+                    ),
+                    const SizedBox(height: 14),
+                    _ReadOnlyField(
+                      label: 'Mode of Payment',
+                      value: invoice.paymentMode,
+                    ),
+                    const SizedBox(height: 14),
+                    _ReadOnlyField(
+                      label: 'Payment Amount',
+                      value: invoice.paymentAmount == null
+                          ? '-'
+                          : invoice.paymentAmount!.toStringAsFixed(2),
                     ),
                     const SizedBox(height: 14),
                     _ReadOnlyField(
@@ -189,13 +211,11 @@ class SalesInvoiceDetailPage extends ConsumerWidget {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failure == null ? 'Sales invoice deleted.' : failure.message,
-        ),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Sales invoice deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
 
     if (failure == null && context.mounted) {
       context.pop();

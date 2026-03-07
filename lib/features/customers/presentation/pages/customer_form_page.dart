@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../controllers/customers_controller.dart';
 
 class CustomerFormPage extends ConsumerStatefulWidget {
@@ -178,16 +179,16 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
 
     setState(() {
       _submitting = false;
-      _errorMessage = failure?.message;
     });
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
+    context.showAppSuccess(
+      widget.isEdit ? 'Customer updated.' : 'Customer created.',
+    );
     context.pop(true);
   }
 
@@ -240,12 +241,15 @@ class _CustomerFormPageState extends ConsumerState<CustomerFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          AppLoadErrorReporter(
+                            message: _errorMessage!,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                           ),

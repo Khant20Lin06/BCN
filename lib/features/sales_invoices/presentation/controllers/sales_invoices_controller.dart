@@ -113,6 +113,7 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
         'fields': jsonEncode(<String>[
           ...ApiConstants.salesInvoiceFields,
           'items',
+          'payments',
         ]),
       },
     );
@@ -187,6 +188,25 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
         .toList(growable: false);
   }
 
+  Future<List<String>> fetchModeOfPaymentOptions() async {
+    try {
+      return _fetchAllFieldOptions(
+        endpoint: ApiConstants.modeOfPaymentPath,
+        fieldName: 'name',
+        orderBy: 'name asc',
+        filters: const <List<dynamic>>[
+          <dynamic>['Mode of Payment', 'enabled', '=', 1],
+        ],
+      );
+    } catch (_) {
+      return _fetchAllFieldOptions(
+        endpoint: ApiConstants.modeOfPaymentPath,
+        fieldName: 'name',
+        orderBy: 'name asc',
+      );
+    }
+  }
+
   Future<List<SalesInvoiceItemOption>> fetchItemOptions() async {
     try {
       return _fetchAllItemOptions(
@@ -205,6 +225,61 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
             (String name) => SalesInvoiceItemOption(value: name, label: name),
           )
           .toList(growable: false);
+    }
+  }
+
+  Future<Map<String, double>> fetchItemRateMap({
+    required String priceList,
+    required Iterable<String> itemCodes,
+  }) async {
+    final String normalizedPriceList = priceList.trim();
+    final List<String> normalizedCodes = itemCodes
+        .map((String value) => value.trim())
+        .where((String value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (normalizedPriceList.isEmpty || normalizedCodes.isEmpty) {
+      return const <String, double>{};
+    }
+
+    try {
+      final Map<String, dynamic> json = await _apiClient.get(
+        ApiConstants.itemPricePath,
+        queryParameters: <String, dynamic>{
+          'fields': jsonEncode(<String>[
+            'item_code',
+            'price_list_rate',
+            'modified',
+          ]),
+          'filters': jsonEncode(<List<dynamic>>[
+            <dynamic>['Item Price', 'price_list', '=', normalizedPriceList],
+            <dynamic>['Item Price', 'item_code', 'in', normalizedCodes],
+          ]),
+          'order_by': 'modified desc',
+          'limit_page_length': 500,
+        },
+      );
+
+      final List<dynamic> raw = (json['data'] as List<dynamic>?) ?? <dynamic>[];
+      final Map<String, double> result = <String, double>{};
+
+      for (final Map<String, dynamic> row
+          in raw.whereType<Map<String, dynamic>>()) {
+        final String code = (row['item_code'] as String? ?? '').trim();
+        if (code.isEmpty || result.containsKey(code)) {
+          continue;
+        }
+        final double? rate = _toDouble(row['price_list_rate']);
+        if (rate == null) {
+          continue;
+        }
+        result[code] = rate;
+      }
+
+      return result;
+    } catch (_) {
+      return const <String, double>{};
     }
   }
 
@@ -235,6 +310,9 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     required String currency,
     required String priceList,
     String? sourceWarehouse,
+    required bool isPos,
+    String? paymentMode,
+    double? paymentAmount,
     required List<SalesInvoiceLineInput> lines,
   }) async {
     try {
@@ -254,8 +332,10 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
         'due_date': postingDate.trim(),
         'currency': currency.trim(),
         'selling_price_list': priceList.trim(),
+        'is_pos': isPos ? 1 : 0,
         if (normalizedWarehouse.isNotEmpty)
           'set_warehouse': normalizedWarehouse,
+        if (isPos) 'payments': _buildPaymentsPayload(paymentMode, paymentAmount),
         'items': linePayload,
       };
 
@@ -274,6 +354,9 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
     required String currency,
     required String priceList,
     String? sourceWarehouse,
+    required bool isPos,
+    String? paymentMode,
+    double? paymentAmount,
     required List<SalesInvoiceLineInput> lines,
   }) async {
     try {
@@ -291,8 +374,12 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
         'due_date': postingDate.trim(),
         'currency': currency.trim(),
         'selling_price_list': priceList.trim(),
+        'is_pos': isPos ? 1 : 0,
         if (normalizedWarehouse.isNotEmpty)
           'set_warehouse': normalizedWarehouse,
+        'payments': isPos
+            ? _buildPaymentsPayload(paymentMode, paymentAmount)
+            : <Map<String, dynamic>>[],
         'items': linePayload,
       };
 
@@ -331,7 +418,7 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
             message.contains('status code of 500'))) {
       return const ValidationFailure(
         message:
-            'ERPNext rejected Sales Invoice. Please check customer defaults, item price/rate, receivable account, and tax/company setup.',
+            'ERPNext rejected Sales Invoice. Please check currency, item price/rate, POS payment details, receivable account, and tax/company setup.',
       );
     }
     return failure;
@@ -448,6 +535,22 @@ class SalesInvoicesController extends StateNotifier<SalesInvoicesState> {
   }
 }
 
+List<Map<String, dynamic>> _buildPaymentsPayload(
+  String? paymentMode,
+  double? paymentAmount,
+) {
+  final String normalizedMode = (paymentMode ?? '').trim();
+  if (normalizedMode.isEmpty || paymentAmount == null || paymentAmount <= 0) {
+    return const <Map<String, dynamic>>[];
+  }
+  return <Map<String, dynamic>>[
+    <String, dynamic>{
+      'mode_of_payment': normalizedMode,
+      'amount': paymentAmount,
+    },
+  ];
+}
+
 class SalesInvoiceItemOption {
   const SalesInvoiceItemOption({required this.value, required this.label});
 
@@ -494,6 +597,21 @@ SalesInvoiceEntity _mapSalesInvoice(Map<String, dynamic> data) {
       )
       .where((SalesInvoiceLineEntity line) => line.itemCode.isNotEmpty)
       .toList(growable: false);
+  final List<dynamic> rawPayments =
+      (data['payments'] as List<dynamic>?) ?? <dynamic>[];
+  String paymentMode = '';
+  double? paymentAmount;
+  for (final Map<String, dynamic> row
+      in rawPayments.whereType<Map<String, dynamic>>()) {
+    final String candidateMode = (row['mode_of_payment'] as String? ?? '').trim();
+    final double? candidateAmount = _toDouble(row['amount']);
+    if (candidateMode.isEmpty && candidateAmount == null) {
+      continue;
+    }
+    paymentMode = candidateMode;
+    paymentAmount = candidateAmount;
+    break;
+  }
 
   return SalesInvoiceEntity(
     id: (data['name'] as String?) ?? '',
@@ -502,6 +620,9 @@ SalesInvoiceEntity _mapSalesInvoice(Map<String, dynamic> data) {
     currency: (data['currency'] as String? ?? '').trim(),
     priceList: (data['selling_price_list'] as String? ?? '').trim(),
     sourceWarehouse: (data['set_warehouse'] as String? ?? '').trim(),
+    isPos: _toBool(data['is_pos']),
+    paymentMode: paymentMode,
+    paymentAmount: paymentAmount,
     grandTotal: _toDouble(data['grand_total']) ?? 0,
     status: (data['status'] as String?) ?? '',
     items: items,
@@ -534,4 +655,18 @@ double? _toDouble(dynamic value) {
     return double.tryParse(value.trim());
   }
   return null;
+}
+
+bool _toBool(dynamic value) {
+  if (value is bool) {
+    return value;
+  }
+  if (value is num) {
+    return value != 0;
+  }
+  if (value is String) {
+    final String normalized = value.trim().toLowerCase();
+    return normalized == '1' || normalized == 'true' || normalized == 'yes';
+  }
+  return false;
 }

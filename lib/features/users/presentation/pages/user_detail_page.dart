@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/user_entity.dart';
@@ -35,19 +36,22 @@ class UserDetailPage extends ConsumerWidget {
 
     return userAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object error, StackTrace stackTrace) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(error.toString()),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: () => ref.invalidate(userDetailProvider(userId)),
-                child: const Text('Retry'),
-              ),
-            ],
+      error: (Object error, StackTrace stackTrace) => AppLoadErrorReporter(
+        message: error.toString(),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(error.toString()),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: () => ref.invalidate(userDetailProvider(userId)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

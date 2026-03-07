@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/api_constants.dart';
 import '../../domain/entities/item_entity.dart';
 
 class ItemCartCard extends StatelessWidget {
-  const ItemCartCard({super.key, required this.item, this.onTap});
+  const ItemCartCard({
+    super.key,
+    required this.item,
+    required this.baseUrl,
+    this.onTap,
+  });
 
   final ItemEntity item;
+  final String baseUrl;
   final VoidCallback? onTap;
 
   @override
@@ -26,7 +31,7 @@ class ItemCartCard extends StatelessWidget {
       color: theme.colorScheme.onSurfaceVariant,
     );
     final TextStyle priceStyle = theme.textTheme.titleMedium!.copyWith(
-      color: const Color(0xFF0D6B61),
+      color: theme.colorScheme.primary,
       fontWeight: FontWeight.w900,
       height: 1.0,
     );
@@ -42,7 +47,7 @@ class ItemCartCard extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(18),
-      child: Container(
+        child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           border: Border.all(color: theme.colorScheme.outlineVariant),
@@ -56,7 +61,7 @@ class ItemCartCard extends StatelessWidget {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          padding: const EdgeInsets.fromLTRB(8, 8, 8, 6),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
@@ -119,7 +124,7 @@ class ItemCartCard extends StatelessWidget {
                 overflow: TextOverflow.ellipsis,
                 style: metaStyle,
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Align(
                 alignment: Alignment.centerRight,
                 child: Text('\$$priceText', style: priceStyle),
@@ -139,7 +144,10 @@ class ItemCartCard extends StatelessWidget {
     if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
       return normalized;
     }
-    return '${ApiConstants.baseUrl}$normalized';
+    if (baseUrl.trim().isEmpty) {
+      return '';
+    }
+    return '${baseUrl.trim()}$normalized';
   }
 }
 

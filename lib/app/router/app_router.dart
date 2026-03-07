@@ -6,6 +6,7 @@ import '../../features/auth/presentation/controllers/auth_controller.dart';
 import '../../features/auth/presentation/pages/auth_gate_page.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/server_setup_page.dart';
 import '../../features/auth/presentation/state/auth_state.dart';
 import '../../core/permissions/app_permission_resolver.dart';
 import '../../features/items/presentation/pages/item_detail_page.dart';
@@ -13,6 +14,7 @@ import '../../features/items/presentation/pages/item_form_page.dart';
 import '../../features/items/presentation/pages/item_list_page.dart';
 import '../../features/shell/presentation/pages/app_shell_page.dart';
 import '../../features/shell/presentation/pages/reports_page.dart';
+import '../../features/shell/presentation/pages/theme_customization_page.dart';
 import '../../features/customers/presentation/pages/customer_detail_page.dart';
 import '../../features/customers/presentation/pages/customer_form_page.dart';
 import '../../features/customers/presentation/pages/customer_list_page.dart';
@@ -48,6 +50,7 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
     routerRefreshNotifierProvider,
   );
   const String authGatePath = '/auth-gate';
+  const String setupPath = '/setup';
   const String loginPath = '/login';
   const String forgotPasswordPath = '/forgot-password';
   const String itemsPath = '/items';
@@ -67,9 +70,17 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         secureStorageServiceProvider,
       );
       final String location = state.matchedLocation;
+      final bool hasConfiguredBaseUrl =
+          (await secureStorageService.getPreferredBaseUrl())?.isNotEmpty ??
+          false;
+      final bool goingSetup = location == setupPath;
       final bool goingLogin = location == loginPath;
       final bool goingForgotPassword = location == forgotPasswordPath;
       final bool goingAuthGate = location == authGatePath;
+
+      if (!hasConfiguredBaseUrl) {
+        return goingSetup ? null : setupPath;
+      }
 
       if (authState.status == AuthStatus.initial ||
           authState.status == AuthStatus.loading) {
@@ -81,11 +92,13 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         final session =
             authState.session ?? await secureStorageService.getSession();
         if (session == null) {
-          ref.read(authControllerProvider.notifier).setUnauthenticated();
-          return (goingLogin || goingForgotPassword) ? null : loginPath;
+          ref.read(authControllerProvider.notifier).setUnauthenticated(
+            message: 'Session expired. Please log in again.',
+          );
+          return goingLogin ? null : loginPath;
         }
 
-        if (goingLogin || goingAuthGate || goingForgotPassword) {
+        if (goingLogin || goingSetup || goingAuthGate || goingForgotPassword) {
           return AppPermissionResolver.firstAllowedHome(session);
         }
 
@@ -96,6 +109,10 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         return null;
       }
 
+      if (goingSetup) {
+        return loginPath;
+      }
+
       return (goingLogin || goingForgotPassword) ? null : loginPath;
     },
     routes: <RouteBase>[
@@ -103,6 +120,11 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
         path: authGatePath,
         builder: (BuildContext context, GoRouterState state) =>
             const AuthGatePage(),
+      ),
+      GoRoute(
+        path: setupPath,
+        builder: (BuildContext context, GoRouterState state) =>
+            const ServerSetupPage(),
       ),
       GoRoute(
         path: loginPath,
@@ -304,6 +326,13 @@ final appRouterProvider = Provider<GoRouter>((Ref ref) {
             path: reportsPath,
             builder: (BuildContext context, GoRouterState state) =>
                 const ReportsPage(),
+            routes: <RouteBase>[
+              GoRoute(
+                path: 'theme',
+                builder: (BuildContext context, GoRouterState state) =>
+                    const ThemeCustomizationPage(),
+              ),
+            ],
           ),
         ],
       ),

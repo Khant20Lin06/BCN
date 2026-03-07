@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../core/constants/api_constants.dart';
 import '../../../../core/error/failure.dart';
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../controllers/items_controller.dart';
@@ -35,24 +35,27 @@ class ItemDetailPage extends ConsumerWidget {
 
     return itemAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (Object error, StackTrace stackTrace) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(error.toString()),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: () => ref.invalidate(itemDetailProvider(itemId)),
-                child: const Text('Retry'),
-              ),
-            ],
+      error: (Object error, StackTrace stackTrace) => AppLoadErrorReporter(
+        message: error.toString(),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(error.toString()),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: () => ref.invalidate(itemDetailProvider(itemId)),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
       data: (item) {
-        final String imageUrl = _resolveImageUrl(item.image);
+        final String imageUrl = _resolveImageUrl(item.image, session?.baseUrl);
         final Widget content = SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 24),
           child: Column(
@@ -198,7 +201,7 @@ class ItemDetailPage extends ConsumerWidget {
     );
   }
 
-  String _resolveImageUrl(String? path) {
+  String _resolveImageUrl(String? path, String? baseUrl) {
     final String normalized = (path ?? '').trim();
     if (normalized.isEmpty) {
       return '';
@@ -206,7 +209,11 @@ class ItemDetailPage extends ConsumerWidget {
     if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
       return normalized;
     }
-    return '${ApiConstants.baseUrl}$normalized';
+    final String resolvedBaseUrl = (baseUrl ?? '').trim();
+    if (resolvedBaseUrl.isEmpty) {
+      return '';
+    }
+    return '$resolvedBaseUrl$normalized';
   }
 
   Future<void> _openEditForm(BuildContext context, WidgetRef ref) async {
@@ -255,11 +262,11 @@ class ItemDetailPage extends ConsumerWidget {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failure == null ? 'Item disabled.' : failure.message),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Item disabled.');
+    } else {
+      context.showAppFailure(failure);
+    }
 
     ref.invalidate(itemDetailProvider(id));
     if (!embedded) {
@@ -308,11 +315,11 @@ class ItemDetailPage extends ConsumerWidget {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failure == null ? 'Item deleted.' : failure.message),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Item deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
 
     if (failure == null) {
       ref.invalidate(itemDetailProvider(id));

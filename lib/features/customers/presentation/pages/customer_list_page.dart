@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../items/presentation/widgets/search_field.dart';
@@ -93,6 +94,7 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
           child: SearchField(
             controller: _searchController,
             onChanged: controller.onSearchChanged,
+            hintText: 'Enter customer name, code, group...',
           ),
         ),
         const SizedBox(height: 10),
@@ -125,19 +127,22 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
     }
 
     if (state.status == CustomersStatus.error && state.customers.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(state.errorMessage ?? 'Failed to load customers'),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: controller.loadCustomers,
-                child: const Text('Retry'),
-              ),
-            ],
+      return AppLoadErrorReporter(
+        message: state.errorMessage ?? 'Failed to load customers',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(state.errorMessage ?? 'Failed to load customers'),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: controller.loadCustomers,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -156,110 +161,59 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
 
     return RefreshIndicator(
       onRefresh: controller.loadCustomers,
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-        itemCount: state.customers.length,
-        separatorBuilder: (BuildContext context, int index) => Divider(
-          height: 1,
-          color: Theme.of(context).colorScheme.outlineVariant,
-        ),
-        itemBuilder: (BuildContext context, int index) {
-          final CustomerEntity customer = state.customers[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 8,
-              vertical: 4,
-            ),
-            onTap: canRead
-                ? () => context.push(
-                    '/customers/${Uri.encodeComponent(customer.id)}',
-                  )
-                : null,
-            title: Text(
-              customer.displayName,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            subtitle: Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(_subtitle(customer)),
-            ),
-            trailing: PopupMenuButton<String>(
-              onSelected: (String action) => _onAction(
-                context,
-                action,
-                customer,
-                canRead: canRead,
-                canWrite: canWrite,
-                canDelete: canDelete,
-              ),
-              itemBuilder: (BuildContext context) {
-                final List<PopupMenuEntry<String>> entries =
-                    <PopupMenuEntry<String>>[];
-                if (canRead) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'view',
-                      child: Text('View'),
-                    ),
-                  );
-                }
-                if (canWrite) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'edit',
-                      child: Text('Edit'),
-                    ),
-                  );
-                }
-                if (canDelete) {
-                  entries.add(
-                    const PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Text('Delete'),
-                    ),
-                  );
-                }
-                return entries;
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.secondaryContainer,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  customer.territory.trim().isEmpty
-                      ? '-'
-                      : customer.territory.trim(),
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: Theme.of(context).colorScheme.onSecondaryContainer,
-                  ),
-                ),
+        children: <Widget>[
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
               ),
             ),
-          );
-        },
+            child: Column(
+              children: <Widget>[
+                const _CustomerTableHeader(),
+                ...List<Widget>.generate(state.customers.length, (int index) {
+                  final CustomerEntity customer = state.customers[index];
+                  return Column(
+                    children: <Widget>[
+                      _CustomerListRow(
+                        customer: customer,
+                        canRead: canRead,
+                        canWrite: canWrite,
+                        canDelete: canDelete,
+                        onTap: canRead
+                            ? () => context.push(
+                                '/customers/${Uri.encodeComponent(customer.id)}',
+                              )
+                            : null,
+                        onAction: (String action) => _onAction(
+                          context,
+                          action,
+                          customer,
+                          canRead: canRead,
+                          canWrite: canWrite,
+                          canDelete: canDelete,
+                        ),
+                      ),
+                      if (index != state.customers.length - 1)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          color: Theme.of(context).colorScheme.outlineVariant
+                              .withValues(alpha: 0.75),
+                        ),
+                    ],
+                  );
+                }),
+              ],
+            ),
+          ),
+        ],
       ),
     );
-  }
-
-  String _subtitle(CustomerEntity customer) {
-    final String type = customer.customerType.trim();
-    final String group = customer.customerGroup.trim();
-    if (type.isEmpty && group.isEmpty) {
-      return customer.id;
-    }
-    if (type.isEmpty) {
-      return group;
-    }
-    if (group.isEmpty) {
-      return type;
-    }
-    return '$type • $group';
   }
 
   Future<void> _onAction(
@@ -324,9 +278,260 @@ class _CustomerListPageState extends ConsumerState<CustomerListPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failure == null ? 'Customer deleted.' : failure.message),
+    if (failure == null) {
+      context.showAppSuccess('Customer deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
+  }
+}
+
+class _CustomerTableHeader extends StatelessWidget {
+  const _CustomerTableHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextStyle headerStyle = theme.textTheme.labelMedium!.copyWith(
+      fontWeight: FontWeight.w800,
+      color: theme.colorScheme.onSecondaryContainer,
+      letterSpacing: 0.2,
+    );
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.7),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+      ),
+      child: Row(
+        children: <Widget>[
+          Expanded(flex: 5, child: Text('Customer', style: headerStyle)),
+          Expanded(flex: 3, child: Text('Group', style: headerStyle)),
+          Expanded(flex: 3, child: Text('Territory', style: headerStyle)),
+          const SizedBox(width: 32),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerListRow extends StatelessWidget {
+  const _CustomerListRow({
+    required this.customer,
+    required this.canRead,
+    required this.canWrite,
+    required this.canDelete,
+    required this.onAction,
+    this.onTap,
+  });
+
+  final CustomerEntity customer;
+  final bool canRead;
+  final bool canWrite;
+  final bool canDelete;
+  final VoidCallback? onTap;
+  final ValueChanged<String> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final TextStyle titleStyle = theme.textTheme.titleSmall!.copyWith(
+      fontWeight: FontWeight.w800,
+      height: 1.1,
+    );
+    final TextStyle idStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w700,
+      color: theme.colorScheme.onSurfaceVariant,
+      letterSpacing: 0.2,
+    );
+    final TextStyle valueStyle = theme.textTheme.labelMedium!.copyWith(
+      fontWeight: FontWeight.w700,
+      color: theme.colorScheme.onSurface,
+    );
+    final TextStyle secondaryStyle = theme.textTheme.labelSmall!.copyWith(
+      fontWeight: FontWeight.w600,
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              flex: 5,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    customer.displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: titleStyle,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    customer.id,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: idStyle,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: _InfoCell(
+                icon: Icons.group_outlined,
+                primary: _groupValue(customer),
+                secondary: customer.customerType.trim(),
+                valueStyle: valueStyle,
+                secondaryStyle: secondaryStyle,
+              ),
+            ),
+            Expanded(
+              flex: 3,
+              child: _InfoCell(
+                icon: Icons.location_on_outlined,
+                primary: customer.territory.trim().isEmpty
+                    ? '-'
+                    : customer.territory.trim(),
+                secondary: null,
+                valueStyle: valueStyle,
+                secondaryStyle: secondaryStyle,
+              ),
+            ),
+            SizedBox(
+              width: 32,
+              child: _CustomerActionButton(
+                canRead: canRead,
+                canWrite: canWrite,
+                canDelete: canDelete,
+                onAction: onAction,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _groupValue(CustomerEntity customer) {
+    final String group = customer.customerGroup.trim();
+    if (group.isNotEmpty) {
+      return group;
+    }
+    final String type = customer.customerType.trim();
+    if (type.isNotEmpty) {
+      return type;
+    }
+    return '-';
+  }
+}
+
+class _InfoCell extends StatelessWidget {
+  const _InfoCell({
+    required this.icon,
+    required this.primary,
+    required this.valueStyle,
+    required this.secondaryStyle,
+    this.secondary,
+  });
+
+  final IconData icon;
+  final String primary;
+  final String? secondary;
+  final TextStyle valueStyle;
+  final TextStyle secondaryStyle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Icon(
+              icon,
+              size: 15,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  primary,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: valueStyle,
+                ),
+                if (secondary != null && secondary!.trim().isNotEmpty)
+                  Text(
+                    secondary!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: secondaryStyle,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CustomerActionButton extends StatelessWidget {
+  const _CustomerActionButton({
+    required this.canRead,
+    required this.canWrite,
+    required this.canDelete,
+    required this.onAction,
+  });
+
+  final bool canRead;
+  final bool canWrite;
+  final bool canDelete;
+  final ValueChanged<String> onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<PopupMenuEntry<String>> entries = <PopupMenuEntry<String>>[];
+    if (canRead) {
+      entries.add(
+        const PopupMenuItem<String>(value: 'view', child: Text('View')),
+      );
+    }
+    if (canWrite) {
+      entries.add(
+        const PopupMenuItem<String>(value: 'edit', child: Text('Edit')),
+      );
+    }
+    if (canDelete) {
+      entries.add(
+        const PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
+      );
+    }
+
+    if (entries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      onSelected: onAction,
+      itemBuilder: (BuildContext context) => entries,
+      icon: Icon(
+        Icons.more_vert_rounded,
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
       ),
     );
   }

@@ -4,7 +4,6 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../features/auth/domain/entities/session_entity.dart';
-import '../constants/api_constants.dart';
 import '../error/app_exception.dart';
 import '../storage/secure_storage_service.dart';
 import 'dio_factory.dart';
@@ -25,11 +24,15 @@ class FrappeApiClient {
     SessionEntity? sessionOverride,
     bool requireAuth = true,
     String? baseUrlOverride,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) async {
     final Dio dio = await _buildDio(
       sessionOverride: sessionOverride,
       requireAuth: requireAuth,
       baseUrlOverride: baseUrlOverride,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
     );
     final Response<dynamic> response = await dio.get<dynamic>(
       path,
@@ -44,11 +47,15 @@ class FrappeApiClient {
     SessionEntity? sessionOverride,
     bool requireAuth = true,
     String? baseUrlOverride,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) async {
     final Dio dio = await _buildDio(
       sessionOverride: sessionOverride,
       requireAuth: requireAuth,
       baseUrlOverride: baseUrlOverride,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
     );
     final Response<dynamic> response = await dio.post<dynamic>(
       path,
@@ -64,11 +71,15 @@ class FrappeApiClient {
     SessionEntity? sessionOverride,
     String? baseUrlOverride,
     Options? options,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) async {
     final Dio dio = await _buildDio(
       sessionOverride: sessionOverride,
       requireAuth: requireAuth,
       baseUrlOverride: baseUrlOverride,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
     );
     return dio.post<dynamic>(path, data: data, options: options);
   }
@@ -77,14 +88,29 @@ class FrappeApiClient {
     String path, {
     Map<String, dynamic>? data,
     SessionEntity? sessionOverride,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) async {
-    final Dio dio = await _buildDio(sessionOverride: sessionOverride);
+    final Dio dio = await _buildDio(
+      sessionOverride: sessionOverride,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+    );
     final Response<dynamic> response = await dio.put<dynamic>(path, data: data);
     return _asMap(response.data);
   }
 
-  Future<void> delete(String path, {SessionEntity? sessionOverride}) async {
-    final Dio dio = await _buildDio(sessionOverride: sessionOverride);
+  Future<void> delete(
+    String path, {
+    SessionEntity? sessionOverride,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
+  }) async {
+    final Dio dio = await _buildDio(
+      sessionOverride: sessionOverride,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+    );
     await dio.delete<dynamic>(path);
   }
 
@@ -92,6 +118,8 @@ class FrappeApiClient {
     SessionEntity? sessionOverride,
     bool requireAuth = true,
     String? baseUrlOverride,
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) async {
     final SessionEntity? session =
         sessionOverride ?? await _storageService.getSession();
@@ -108,13 +136,22 @@ class FrappeApiClient {
       return _dioFactory.create(
         baseUrl: session.baseUrl,
         headers: <String, String>{'Cookie': session.cookieHeader},
+        connectTimeout: connectTimeout,
+        receiveTimeout: receiveTimeout,
       );
     }
 
     final String baseUrl =
-        (baseUrlOverride ?? session?.baseUrl ?? ApiConstants.baseUrl).trim();
+        (baseUrlOverride ?? session?.baseUrl ?? '').trim();
+    if (baseUrl.isEmpty) {
+      throw AppException(message: 'Server URL is not configured');
+    }
     _validateBaseUrl(baseUrl);
-    return _dioFactory.create(baseUrl: baseUrl);
+    return _dioFactory.create(
+      baseUrl: baseUrl,
+      connectTimeout: connectTimeout,
+      receiveTimeout: receiveTimeout,
+    );
   }
 
   void _validateBaseUrl(String baseUrl) {

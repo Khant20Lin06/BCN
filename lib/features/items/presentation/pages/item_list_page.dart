@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../domain/entities/item_entity.dart';
@@ -75,6 +76,7 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
   Widget build(BuildContext context) {
     final ItemsState state = ref.watch(itemsControllerProvider);
     final session = ref.watch(authControllerProvider).session;
+    final String baseUrl = session?.baseUrl.trim() ?? '';
     final bool canRead = AppPermissionResolver.can(
       session,
       AppModule.items,
@@ -107,6 +109,7 @@ class _ItemListPageState extends ConsumerState<ItemListPage> {
           onItemGroupChanged: (String? group) => ref
               .read(itemsControllerProvider.notifier)
               .onItemGroupChanged(group),
+          baseUrl: baseUrl,
           onDisabledChanged: (bool? disabled) => ref
               .read(itemsControllerProvider.notifier)
               .onDisabledFilterChanged(disabled),
@@ -167,6 +170,7 @@ class _ListPane extends StatelessWidget {
     required this.onRefresh,
     required this.onSearch,
     required this.onItemGroupChanged,
+    required this.baseUrl,
     required this.onDisabledChanged,
     required this.onViewModeChanged,
     required this.onSortChanged,
@@ -185,6 +189,7 @@ class _ListPane extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final ValueChanged<String> onSearch;
   final ValueChanged<String?> onItemGroupChanged;
+  final String baseUrl;
   final ValueChanged<bool?> onDisabledChanged;
   final ValueChanged<ItemListViewMode> onViewModeChanged;
   final void Function({required ItemSortField field, required bool ascending})
@@ -364,16 +369,19 @@ class _ListPane extends StatelessWidget {
     }
 
     if (state.status == ItemsStatus.error && state.items.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(state.errorMessage ?? 'Failed to load items'),
-              const SizedBox(height: 10),
-              FilledButton(onPressed: onRetry, child: const Text('Retry')),
-            ],
+      return AppLoadErrorReporter(
+        message: state.errorMessage ?? 'Failed to load items',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(state.errorMessage ?? 'Failed to load items'),
+                const SizedBox(height: 10),
+                FilledButton(onPressed: onRetry, child: const Text('Retry')),
+              ],
+            ),
           ),
         ),
       );
@@ -415,6 +423,7 @@ class _ListPane extends StatelessWidget {
           final ItemEntity item = state.items[index];
           return ItemListTile(
             item: item,
+            baseUrl: baseUrl,
             onTap: canRead ? () => onSelect(item.id) : null,
           );
         },
@@ -435,7 +444,7 @@ class _ListPane extends StatelessWidget {
                 maxCrossAxisExtent: 220,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                mainAxisExtent: 238,
+                mainAxisExtent: 216,
               ),
               delegate: SliverChildBuilderDelegate((
                 BuildContext context,
@@ -444,6 +453,7 @@ class _ListPane extends StatelessWidget {
                 final ItemEntity item = state.items[index];
                 return ItemCartCard(
                   item: item,
+                  baseUrl: baseUrl,
                   onTap: canRead ? () => onSelect(item.id) : null,
                 );
               }, childCount: state.items.length),

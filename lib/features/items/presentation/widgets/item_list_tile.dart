@@ -1,17 +1,24 @@
 import 'package:flutter/material.dart';
 
-import '../../../../core/constants/api_constants.dart';
 import '../../domain/entities/item_entity.dart';
 
 class ItemListTile extends StatelessWidget {
-  const ItemListTile({super.key, required this.item, this.onTap});
+  const ItemListTile({
+    super.key,
+    required this.item,
+    required this.baseUrl,
+    this.onTap,
+  });
 
   final ItemEntity item;
+  final String baseUrl;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    final bool narrow = screenWidth < 390;
     final TextStyle itemNameStyle = theme.textTheme.titleMedium!.copyWith(
       fontWeight: FontWeight.w800,
       height: 1.1,
@@ -26,7 +33,7 @@ class ItemListTile extends StatelessWidget {
       letterSpacing: 0.2,
     );
     final TextStyle priceStyle = theme.textTheme.titleMedium!.copyWith(
-      color: const Color(0xFF0D6B61),
+      color: theme.colorScheme.primary,
       fontWeight: FontWeight.w800,
       height: 1.1,
     );
@@ -44,18 +51,21 @@ class ItemListTile extends StatelessWidget {
       onTap: onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        padding: EdgeInsets.symmetric(
+          horizontal: narrow ? 10 : 12,
+          vertical: narrow ? 8 : 10,
+        ),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: theme.colorScheme.outlineVariant),
         ),
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            final bool compact = constraints.maxWidth < 390;
-            final Widget thumbnail = Container(
-              width: compact ? 52 : 56,
-              height: compact ? 52 : 56,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Container(
+              width: narrow ? 52 : 56,
+              height: narrow ? 52 : 56,
               decoration: BoxDecoration(
                 color: theme.colorScheme.surfaceContainerHighest.withValues(
                   alpha: 0.45,
@@ -71,52 +81,61 @@ class ItemListTile extends StatelessWidget {
                       errorBuilder: (_, error, stackTrace) =>
                           const Icon(Icons.inventory_2_outlined, size: 24),
                     ),
-            );
-
-            final Widget metaBlock = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.itemName,
-                  maxLines: compact ? 2 : 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: itemNameStyle,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 1),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      item.itemName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: itemNameStyle,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'CODE: ${itemCode.isEmpty ? '-' : itemCode}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: metaStyle,
+                    ),
+                    Text(
+                      'GROUP: ${item.itemGroup}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: metaStyle,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'CODE: ${itemCode.isEmpty ? '-' : itemCode}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: metaStyle,
-                ),
-                Text(
-                  'GROUP: ${item.itemGroup}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: metaStyle,
-                ),
-              ],
-            );
-
-            final Widget qtyPriceBlock = Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: <Widget>[
-                Text('QTY: $qtyText Units', style: qtyStyle),
-                const SizedBox(height: 4),
-                Text('\$$priceText', style: priceStyle),
-              ],
-            );
-
-            if (compact) {
-              return Column(
+              ),
+            ),
+            const SizedBox(width: 8),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: narrow ? 104 : 118,
+                maxWidth: narrow ? 104 : 118,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      thumbnail,
-                      const SizedBox(width: 10),
-                      Expanded(child: metaBlock),
+                      Flexible(
+                        child: Text(
+                          'QTY: $qtyText Units',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: qtyStyle,
+                        ),
+                      ),
                       const SizedBox(width: 6),
                       Icon(
                         Icons.arrow_forward_ios_rounded,
@@ -125,32 +144,18 @@ class ItemListTile extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: qtyPriceBlock,
+                  const SizedBox(height: 6),
+                  Text(
+                    '\$$priceText',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.right,
+                    style: priceStyle,
                   ),
                 ],
-              );
-            }
-
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                thumbnail,
-                const SizedBox(width: 10),
-                Expanded(child: metaBlock),
-                const SizedBox(width: 6),
-                qtyPriceBlock,
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  size: 14,
-                  color: theme.colorScheme.outline,
-                ),
-              ],
-            );
-          },
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -164,6 +169,9 @@ class ItemListTile extends StatelessWidget {
     if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
       return normalized;
     }
-    return '${ApiConstants.baseUrl}$normalized';
+    if (baseUrl.trim().isEmpty) {
+      return '';
+    }
+    return '${baseUrl.trim()}$normalized';
   }
 }

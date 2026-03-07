@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../domain/entities/stock_balance_entity.dart';
 import '../controllers/stock_balances_controller.dart';
 
@@ -190,9 +191,7 @@ class _StockBalanceFormPageState extends ConsumerState<StockBalanceFormPage> {
 
     final double? actualQty = double.tryParse(_actualQtyController.text.trim());
     if (actualQty == null) {
-      setState(() {
-        _errorMessage = 'Actual Qty must be a valid number.';
-      });
+      context.showAppError('Actual Qty must be a valid number.');
       return;
     }
 
@@ -200,9 +199,7 @@ class _StockBalanceFormPageState extends ConsumerState<StockBalanceFormPage> {
       _valuationRateController.text.trim(),
     );
     if (valuationRate == null || valuationRate <= 0) {
-      setState(() {
-        _errorMessage = 'Valuation Rate must be greater than 0.';
-      });
+      context.showAppError('Valuation Rate must be greater than 0.');
       return;
     }
 
@@ -238,16 +235,16 @@ class _StockBalanceFormPageState extends ConsumerState<StockBalanceFormPage> {
 
     setState(() {
       _submitting = false;
-      _errorMessage = failure?.message;
     });
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
+    context.showAppSuccess(
+      widget.isEdit ? 'Stock balance updated.' : 'Stock balance created.',
+    );
     context.pop(true);
   }
 
@@ -299,12 +296,15 @@ class _StockBalanceFormPageState extends ConsumerState<StockBalanceFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          AppLoadErrorReporter(
+                            message: _errorMessage!,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                           ),

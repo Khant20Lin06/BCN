@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../widgets/sidebar_drawer.dart';
 
 class AppShellPage extends StatelessWidget {
@@ -12,14 +13,16 @@ class AppShellPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final String location = GoRouterState.of(context).uri.path;
     final int currentIndex = _currentIndex(location);
+    final ThemeData theme = Theme.of(context);
+    final BcnThemePalette palette = theme.bcnPalette;
     return Scaffold(
       drawer: const SidebarDrawer(),
       body: SafeArea(child: child),
       bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
         currentIndex: currentIndex,
-        selectedItemColor: const Color(0xFF0A6772),
-        unselectedItemColor: const Color(0xFF8A96A3),
+        backgroundColor: palette.navigation,
+        selectedItemColor: palette.onNavigation,
+        unselectedItemColor: palette.onNavigation.withValues(alpha: 0.62),
         selectedFontSize: 12,
         unselectedFontSize: 11,
         selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w700),

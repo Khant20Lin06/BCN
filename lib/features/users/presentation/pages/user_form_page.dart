@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../controllers/users_controller.dart';
 
 class UserFormPage extends ConsumerStatefulWidget {
@@ -153,11 +154,8 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
       if (uploadFailure != null) {
         setState(() {
           _submitting = false;
-          _errorMessage = uploadFailure.message;
         });
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(uploadFailure.message)));
+        context.showAppFailure(uploadFailure);
         return;
       }
       userImage = upload.rightOrNull;
@@ -192,16 +190,18 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
 
     setState(() {
       _submitting = false;
-      _errorMessage = failure?.message;
     });
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
+    context.showAppSuccess(
+      widget.isEdit
+          ? (widget.isProfileMode ? 'Profile updated.' : 'User updated.')
+          : 'User created.',
+    );
     context.pop(true);
   }
 
@@ -255,12 +255,15 @@ class _UserFormPageState extends ConsumerState<UserFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          AppLoadErrorReporter(
+                            message: _errorMessage!,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                           ),

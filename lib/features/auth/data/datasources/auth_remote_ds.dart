@@ -7,13 +7,17 @@ import '../../../../core/error/app_exception.dart';
 import '../../../../core/network/frappe_api_client.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../../core/permissions/permission_flags.dart';
+import '../../../../core/storage/secure_storage_service.dart';
 import '../../domain/entities/session_entity.dart';
 
 class AuthRemoteDataSource {
-  const AuthRemoteDataSource(this._apiClient);
+  const AuthRemoteDataSource(this._apiClient, this._storageService);
 
   final FrappeApiClient _apiClient;
+  final SecureStorageService _storageService;
   static bool _crudPermissionProbeUnavailable = false;
+  static const Duration _authConnectTimeout = Duration(seconds: 30);
+  static const Duration _authReceiveTimeout = Duration(seconds: 45);
 
   static const Map<AppModule, List<String>> _moduleDocTypes =
       <AppModule, List<String>>{
@@ -47,12 +51,15 @@ class AuthRemoteDataSource {
     required String email,
     required String password,
   }) async {
+    final String baseUrl = await _resolveBaseUrl();
     final response = await _apiClient.postRaw(
       '/api/method/login',
       requireAuth: false,
-      baseUrlOverride: ApiConstants.baseUrl,
+      baseUrlOverride: baseUrl,
       data: <String, dynamic>{'usr': email, 'pwd': password},
       options: Options(contentType: Headers.formUrlEncodedContentType),
+      connectTimeout: _authConnectTimeout,
+      receiveTimeout: _authReceiveTimeout,
     );
 
     final List<String> setCookies =
@@ -63,7 +70,7 @@ class AuthRemoteDataSource {
     }
 
     final SessionEntity candidate = SessionEntity(
-      baseUrl: ApiConstants.baseUrl,
+      baseUrl: baseUrl,
       username: email,
       cookieHeader: cookieHeader,
     );
@@ -72,6 +79,8 @@ class AuthRemoteDataSource {
       ApiConstants.loggedUserPath,
       requireAuth: true,
       sessionOverride: candidate,
+      connectTimeout: _authConnectTimeout,
+      receiveTimeout: _authReceiveTimeout,
     );
 
     final dynamic message = me['message'];
@@ -93,6 +102,8 @@ class AuthRemoteDataSource {
         ApiConstants.loggedUserPath,
         requireAuth: true,
         sessionOverride: session,
+        connectTimeout: _authConnectTimeout,
+        receiveTimeout: _authReceiveTimeout,
       );
       final dynamic message = me['message'];
       final dynamic data = me['data'];
@@ -110,12 +121,15 @@ class AuthRemoteDataSource {
   }
 
   Future<String> requestPasswordReset({required String email}) async {
+    final String baseUrl = await _resolveBaseUrl();
     final Response<dynamic> response = await _apiClient.postRaw(
       ApiConstants.forgotPasswordPath,
       requireAuth: false,
-      baseUrlOverride: ApiConstants.baseUrl,
+      baseUrlOverride: baseUrl,
       data: <String, dynamic>{'user': email.trim()},
       options: Options(contentType: Headers.formUrlEncodedContentType),
+      connectTimeout: _authConnectTimeout,
+      receiveTimeout: _authReceiveTimeout,
     );
 
     final dynamic payload = response.data;
@@ -143,31 +157,39 @@ class AuthRemoteDataSource {
   Future<SessionEntity> _buildSessionWithPermissions(
     SessionEntity baseSession,
   ) async {
-    final List<String> roles = await _fetchUserRoles(
-      session: baseSession,
-      username: baseSession.username,
-    );
-    final Map<String, PermissionFlags> permissions =
-        Map<String, PermissionFlags>.from(
-          await _fetchModulePermissions(session: baseSession, roles: roles),
-        );
-    final Map<String, PermissionFlags> crudProbed = await _probeCrudPermissions(
-      session: baseSession,
-    );
-    for (final MapEntry<String, PermissionFlags> entry in crudProbed.entries) {
-      final PermissionFlags current =
-          permissions[entry.key] ?? PermissionFlags.none;
-      permissions[entry.key] = current.merge(entry.value);
+    try {
+      final List<String> roles = await _fetchUserRoles(
+        session: baseSession,
+        username: baseSession.username,
+      );
+      final Map<String, PermissionFlags> permissions =
+          Map<String, PermissionFlags>.from(
+            await _fetchModulePermissions(session: baseSession, roles: roles),
+          );
+      final Map<String, PermissionFlags> crudProbed =
+          await _probeCrudPermissions(session: baseSession);
+      for (final MapEntry<String, PermissionFlags> entry
+          in crudProbed.entries) {
+        final PermissionFlags current =
+            permissions[entry.key] ?? PermissionFlags.none;
+        permissions[entry.key] = current.merge(entry.value);
+      }
+      final Map<String, PermissionFlags> probed = await _probeReadPermissions(
+        session: baseSession,
+      );
+      for (final MapEntry<String, PermissionFlags> entry in probed.entries) {
+        final PermissionFlags current =
+            permissions[entry.key] ?? PermissionFlags.none;
+        permissions[entry.key] = current.merge(entry.value);
+      }
+      return baseSession.copyWith(roles: roles, permissions: permissions);
+    } on DioException catch (error) {
+      if (_isTimeoutError(error) && _hasCachedAuthContext(baseSession)) {
+        // Preserve cached auth when startup refresh probes time out.
+        return baseSession;
+      }
+      rethrow;
     }
-    final Map<String, PermissionFlags> probed = await _probeReadPermissions(
-      session: baseSession,
-    );
-    for (final MapEntry<String, PermissionFlags> entry in probed.entries) {
-      final PermissionFlags current =
-          permissions[entry.key] ?? PermissionFlags.none;
-      permissions[entry.key] = current.merge(entry.value);
-    }
-    return baseSession.copyWith(roles: roles, permissions: permissions);
   }
 
   Future<Map<String, PermissionFlags>> _probeCrudPermissions({
@@ -257,6 +279,11 @@ class AuthRemoteDataSource {
           roles.add(role);
         }
       }
+    } on DioException catch (error) {
+      if (_isTimeoutError(error)) {
+        rethrow;
+      }
+      // fallback below
     } catch (_) {
       // fallback below
     }
@@ -285,6 +312,11 @@ class AuthRemoteDataSource {
           roles.add(role);
         }
       }
+    } on DioException catch (error) {
+      if (_isTimeoutError(error)) {
+        rethrow;
+      }
+      // keep empty if both endpoints are blocked
     } catch (_) {
       // keep empty if both endpoints are blocked
     }
@@ -316,6 +348,11 @@ class AuthRemoteDataSource {
           }
         }
       }
+    } on DioException catch (error) {
+      if (_isTimeoutError(error)) {
+        rethrow;
+      }
+      // Keep empty if all role endpoints are unavailable.
     } catch (_) {
       // Keep empty if all role endpoints are unavailable.
     }
@@ -407,6 +444,9 @@ class AuthRemoteDataSource {
       );
       return true;
     } on DioException catch (error) {
+      if (_isTimeoutError(error)) {
+        rethrow;
+      }
       final int? code = error.response?.statusCode;
       if (code == 401 || code == 403) {
         return false;
@@ -451,6 +491,11 @@ class AuthRemoteDataSource {
         merged = merged.merge(PermissionFlags.fromDocPermRow(row));
       }
       return merged;
+    } on DioException catch (error) {
+      if (_isTimeoutError(error)) {
+        rethrow;
+      }
+      return null;
     } catch (_) {
       return null;
     }
@@ -485,6 +530,9 @@ class AuthRemoteDataSource {
           return true;
         }
       } on DioException catch (error) {
+        if (_isTimeoutError(error)) {
+          rethrow;
+        }
         if (_isMethodUnavailableStatus(error.response?.statusCode)) {
           _crudPermissionProbeUnavailable = true;
           return false;
@@ -551,5 +599,23 @@ class AuthRemoteDataSource {
 
   static int _compareCaseInsensitive(String a, String b) {
     return a.toLowerCase().compareTo(b.toLowerCase());
+  }
+
+  static bool _isTimeoutError(DioException error) {
+    return error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.receiveTimeout;
+  }
+
+  static bool _hasCachedAuthContext(SessionEntity session) {
+    return session.roles.isNotEmpty || session.permissions.isNotEmpty;
+  }
+
+  Future<String> _resolveBaseUrl() async {
+    final String? preferred = await _storageService.getPreferredBaseUrl();
+    if (preferred != null && preferred.isNotEmpty) {
+      return preferred;
+    }
+    throw AppException(message: 'Server URL is not configured');
   }
 }

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../core/feedback/app_feedback.dart';
 import '../controllers/sales_invoices_controller.dart';
 
 class SalesInvoiceFormPage extends ConsumerStatefulWidget {
@@ -27,6 +30,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   late final TextEditingController _currencyController;
   late final TextEditingController _priceListController;
   late final TextEditingController _sourceWarehouseController;
+  late final TextEditingController _modeOfPaymentController;
+  late final TextEditingController _paymentAmountController;
   late final TextEditingController _grandTotalController;
   late final TextEditingController _statusController;
 
@@ -34,6 +39,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   List<String> _currencyOptions = const <String>[];
   List<String> _priceListOptions = const <String>[];
   List<String> _warehouseOptions = const <String>[];
+  List<String> _modeOfPaymentOptions = const <String>[];
   List<String> _statusOptions = const <String>[];
   List<SalesInvoiceItemOption> _itemOptions = const <SalesInvoiceItemOption>[];
   final List<_SalesInvoiceLineDraft> _lines = <_SalesInvoiceLineDraft>[];
@@ -42,7 +48,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   String? _selectedCurrency;
   String? _selectedPriceList;
   String? _selectedSourceWarehouse;
+  String? _selectedModeOfPayment;
   String? _selectedStatus;
+  bool _isPos = false;
   bool _loading = false;
   bool _submitting = false;
   String? _errorMessage;
@@ -56,6 +64,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _currencyController = TextEditingController();
     _priceListController = TextEditingController();
     _sourceWarehouseController = TextEditingController();
+    _modeOfPaymentController = TextEditingController();
+    _paymentAmountController = TextEditingController();
     _grandTotalController = TextEditingController();
     _statusController = TextEditingController();
 
@@ -75,6 +85,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     _currencyController.dispose();
     _priceListController.dispose();
     _sourceWarehouseController.dispose();
+    _modeOfPaymentController.dispose();
+    _paymentAmountController.dispose();
     _grandTotalController.dispose();
     _statusController.dispose();
     for (final _SalesInvoiceLineDraft line in _lines) {
@@ -93,6 +105,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     List<String> currencyOptions = const <String>[];
     List<String> priceListOptions = const <String>[];
     List<String> warehouseOptions = const <String>[];
+    List<String> modeOfPaymentOptions = const <String>[];
     List<String> statusOptions = const <String>[];
     List<SalesInvoiceItemOption> itemOptions = const <SalesInvoiceItemOption>[];
 
@@ -102,6 +115,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     String currency = '';
     String priceList = '';
     String sourceWarehouse = '';
+    bool isPos = false;
+    String paymentMode = '';
+    String paymentAmount = '';
     String grandTotal = '';
     String status = '';
     List<_SalesInvoiceLineDraft> loadedLines = <_SalesInvoiceLineDraft>[
@@ -133,6 +149,12 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
 
     try {
+      modeOfPaymentOptions = await controller.fetchModeOfPaymentOptions();
+    } catch (_) {
+      modeOfPaymentOptions = const <String>[];
+    }
+
+    try {
       itemOptions = await controller.fetchItemOptions();
     } catch (_) {
       itemOptions = const <SalesInvoiceItemOption>[];
@@ -153,6 +175,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         currency = invoice.currency.trim();
         priceList = invoice.priceList.trim();
         sourceWarehouse = invoice.sourceWarehouse.trim();
+        isPos = invoice.isPos;
+        paymentMode = invoice.paymentMode.trim();
+        paymentAmount = invoice.paymentAmount?.toStringAsFixed(2) ?? '';
         grandTotal = invoice.grandTotal.toStringAsFixed(2);
         status = invoice.status.trim();
 
@@ -196,6 +221,10 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       warehouseOptions,
       sourceWarehouse,
     );
+    final List<String> mergedModeOfPaymentOptions = _mergeWithCurrent(
+      modeOfPaymentOptions,
+      paymentMode,
+    );
     final List<String> mergedStatusOptions = _mergeWithCurrent(
       statusOptions,
       status,
@@ -225,6 +254,7 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _currencyOptions = mergedCurrencyOptions;
       _priceListOptions = mergedPriceListOptions;
       _warehouseOptions = mergedWarehouseOptions;
+      _modeOfPaymentOptions = mergedModeOfPaymentOptions;
       _statusOptions = mergedStatusOptions;
       _itemOptions = itemOptions;
 
@@ -235,6 +265,8 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
         _currencyController.text = currency;
         _priceListController.text = priceList;
         _sourceWarehouseController.text = sourceWarehouse;
+        _modeOfPaymentController.text = paymentMode;
+        _paymentAmountController.text = paymentAmount;
         _grandTotalController.text = grandTotal;
         _statusController.text = status;
       }
@@ -259,6 +291,11 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
           _warehouseOptions.isNotEmpty) {
         _sourceWarehouseController.text = _warehouseOptions.first;
       }
+      if (isPos &&
+          _modeOfPaymentController.text.trim().isEmpty &&
+          _modeOfPaymentOptions.isNotEmpty) {
+        _modeOfPaymentController.text = _modeOfPaymentOptions.first;
+      }
 
       _selectedCustomer = _customerController.text.trim().isEmpty
           ? null
@@ -272,13 +309,19 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       _selectedSourceWarehouse = _sourceWarehouseController.text.trim().isEmpty
           ? null
           : _sourceWarehouseController.text.trim();
+      _selectedModeOfPayment = _modeOfPaymentController.text.trim().isEmpty
+          ? null
+          : _modeOfPaymentController.text.trim();
       _selectedStatus = _statusController.text.trim().isEmpty
           ? null
           : _statusController.text.trim();
 
+      _isPos = isPos;
       _errorMessage = errorMessage;
       _loading = false;
     });
+
+    await _hydrateAllLineRates(force: !widget.isEdit);
   }
 
   Future<void> _pickPostingDate() async {
@@ -304,14 +347,16 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
   }
 
   void _addItemLine() {
+    late final _SalesInvoiceLineDraft draft;
     setState(() {
-      final _SalesInvoiceLineDraft draft = _SalesInvoiceLineDraft();
+      draft = _SalesInvoiceLineDraft();
       if (_itemOptions.isNotEmpty) {
         draft.selectedItemCode = _itemOptions.first.value;
         draft.itemCodeController.text = _itemOptions.first.value;
       }
       _lines.add(draft);
     });
+    unawaited(_hydrateLineRate(draft, force: true));
   }
 
   void _removeItemLine(int index) {
@@ -323,6 +368,80 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       final _SalesInvoiceLineDraft removed = _lines.removeAt(index);
       removed.dispose();
     });
+  }
+
+  Future<void> _hydrateAllLineRates({bool force = false}) async {
+    final String priceList =
+        (_selectedPriceList ?? _priceListController.text).trim();
+    final List<String> itemCodes = _lines
+        .map(
+          (_SalesInvoiceLineDraft line) =>
+              (line.selectedItemCode ?? line.itemCodeController.text).trim(),
+        )
+        .where((String value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+
+    if (priceList.isEmpty || itemCodes.isEmpty) {
+      return;
+    }
+
+    final SalesInvoicesController controller = ref.read(
+      salesInvoicesControllerProvider.notifier,
+    );
+    final Map<String, double> rates = await controller.fetchItemRateMap(
+      priceList: priceList,
+      itemCodes: itemCodes,
+    );
+    if (!mounted || rates.isEmpty) {
+      return;
+    }
+
+    for (final _SalesInvoiceLineDraft line in _lines) {
+      final String itemCode =
+          (line.selectedItemCode ?? line.itemCodeController.text).trim();
+      final double? rate = rates[itemCode];
+      if (rate == null) {
+        continue;
+      }
+      if (!force && line.rateController.text.trim().isNotEmpty) {
+        continue;
+      }
+      line.rateController.text = rate.toStringAsFixed(2);
+    }
+  }
+
+  Future<void> _hydrateLineRate(
+    _SalesInvoiceLineDraft line, {
+    bool force = false,
+  }) async {
+    final String itemCode =
+        (line.selectedItemCode ?? line.itemCodeController.text).trim();
+    final String priceList =
+        (_selectedPriceList ?? _priceListController.text).trim();
+    if (itemCode.isEmpty || priceList.isEmpty) {
+      return;
+    }
+
+    final SalesInvoicesController controller = ref.read(
+      salesInvoicesControllerProvider.notifier,
+    );
+    final Map<String, double> rates = await controller.fetchItemRateMap(
+      priceList: priceList,
+      itemCodes: <String>[itemCode],
+    );
+    if (!mounted) {
+      return;
+    }
+
+    final double? rate = rates[itemCode];
+    if (rate == null) {
+      return;
+    }
+    if (!force && line.rateController.text.trim().isNotEmpty) {
+      return;
+    }
+    line.rateController.text = rate.toStringAsFixed(2);
   }
 
   Future<void> _save() async {
@@ -340,25 +459,17 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
       final double? rate = rateText.isEmpty ? null : double.tryParse(rateText);
 
       if (itemCode.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Item is required in line ${i + 1}.')),
-        );
+        context.showAppError('Item is required in line ${i + 1}.');
         return;
       }
 
       if (qty == null || qty <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Qty must be greater than 0 in line ${i + 1}.'),
-          ),
-        );
+        context.showAppError('Qty must be greater than 0 in line ${i + 1}.');
         return;
       }
 
       if (rateText.isNotEmpty && rate == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Rate must be valid in line ${i + 1}.')),
-        );
+        context.showAppError('Item Price must be valid in line ${i + 1}.');
         return;
       }
 
@@ -368,10 +479,28 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
     }
 
     if (lines.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('At least one item line is required.')),
-      );
+      context.showAppError('At least one item line is required.');
       return;
+    }
+
+    final String paymentMode =
+        (_selectedModeOfPayment ?? _modeOfPaymentController.text).trim();
+    final String paymentAmountText = _paymentAmountController.text.trim();
+    final double? paymentAmount = paymentAmountText.isEmpty
+        ? null
+        : double.tryParse(paymentAmountText);
+
+    if (_isPos) {
+      if (paymentMode.isEmpty) {
+        context.showAppError('Mode of Payment is required for POS invoices.');
+        return;
+      }
+      if (paymentAmount == null || paymentAmount <= 0) {
+        context.showAppError(
+          'Payment Amount must be greater than 0 for POS invoices.',
+        );
+        return;
+      }
     }
 
     setState(() {
@@ -391,6 +520,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             currency: _currencyController.text,
             priceList: _priceListController.text,
             sourceWarehouse: _sourceWarehouseController.text,
+            isPos: _isPos,
+            paymentMode: paymentMode,
+            paymentAmount: paymentAmount,
             lines: lines,
           )
         : await controller.createSalesInvoice(
@@ -400,6 +532,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
             currency: _currencyController.text,
             priceList: _priceListController.text,
             sourceWarehouse: _sourceWarehouseController.text,
+            isPos: _isPos,
+            paymentMode: paymentMode,
+            paymentAmount: paymentAmount,
             lines: lines,
           );
 
@@ -409,16 +544,16 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
 
     setState(() {
       _submitting = false;
-      _errorMessage = failure?.message;
     });
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
+    context.showAppSuccess(
+      widget.isEdit ? 'Sales invoice updated.' : 'Sales invoice created.',
+    );
     context.pop(true);
   }
 
@@ -470,12 +605,15 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          AppLoadErrorReporter(
+                            message: _errorMessage!,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                           ),
@@ -624,6 +762,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                                       _priceListController.text = (value ?? '')
                                           .trim();
                                     });
+                                    unawaited(
+                                      _hydrateAllLineRates(force: true),
+                                    );
                                   },
                             validator: (String? value) {
                               if (value == null || value.trim().isEmpty) {
@@ -638,6 +779,9 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             decoration: const InputDecoration(
                               hintText: 'Price List',
                             ),
+                            onChanged: (_) {
+                              unawaited(_hydrateAllLineRates(force: true));
+                            },
                             validator: (String? value) {
                               if (value == null || value.trim().isEmpty) {
                                 return 'Price List is required';
@@ -684,6 +828,115 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             ),
                           ),
                         const SizedBox(height: 16),
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'Include POS Payment',
+                            style: TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          value: _isPos,
+                          onChanged: isBusy
+                              ? null
+                              : (bool value) {
+                                  setState(() {
+                                    _isPos = value;
+                                    if (value &&
+                                        _modeOfPaymentController.text
+                                            .trim()
+                                            .isEmpty &&
+                                        _modeOfPaymentOptions.isNotEmpty) {
+                                      final String first =
+                                          _modeOfPaymentOptions.first;
+                                      _selectedModeOfPayment = first;
+                                      _modeOfPaymentController.text = first;
+                                    }
+                                    if (!value) {
+                                      _selectedModeOfPayment = null;
+                                      _modeOfPaymentController.clear();
+                                      _paymentAmountController.clear();
+                                    }
+                                  });
+                                },
+                        ),
+                        if (_isPos) ...<Widget>[
+                          const SizedBox(height: 8),
+                          const _FieldLabel(label: 'Mode of Payment *'),
+                          if (_modeOfPaymentOptions.isNotEmpty)
+                            DropdownButtonFormField<String>(
+                              key: ValueKey<String>(
+                                'mode-of-payment-${_selectedModeOfPayment ?? ''}-${_modeOfPaymentOptions.length}',
+                              ),
+                              initialValue: _selectedModeOfPayment,
+                              decoration: const InputDecoration(),
+                              items: _modeOfPaymentOptions
+                                  .map(
+                                    (String value) => DropdownMenuItem<String>(
+                                      value: value,
+                                      child: Text(value),
+                                    ),
+                                  )
+                                  .toList(growable: false),
+                              onChanged: isBusy
+                                  ? null
+                                  : (String? value) {
+                                      setState(() {
+                                        _selectedModeOfPayment = value;
+                                        _modeOfPaymentController.text =
+                                            (value ?? '').trim();
+                                      });
+                                    },
+                              validator: (String? value) {
+                                if (!_isPos) {
+                                  return null;
+                                }
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Mode of Payment is required';
+                                }
+                                return null;
+                              },
+                            )
+                          else
+                            TextFormField(
+                              controller: _modeOfPaymentController,
+                              decoration: const InputDecoration(
+                                hintText: 'Mode of Payment',
+                              ),
+                              validator: (String? value) {
+                                if (!_isPos) {
+                                  return null;
+                                }
+                                if (value == null || value.trim().isEmpty) {
+                                  return 'Mode of Payment is required';
+                                }
+                                return null;
+                              },
+                            ),
+                          const SizedBox(height: 14),
+                          const _FieldLabel(label: 'Payment Amount *'),
+                          TextFormField(
+                            controller: _paymentAmountController,
+                            keyboardType: const TextInputType.numberWithOptions(
+                              decimal: true,
+                            ),
+                            decoration: const InputDecoration(
+                              hintText: 'Payment Amount',
+                            ),
+                            validator: (String? value) {
+                              if (!_isPos) {
+                                return null;
+                              }
+                              final String text = (value ?? '').trim();
+                              final double? amount = text.isEmpty
+                                  ? null
+                                  : double.tryParse(text);
+                              if (amount == null || amount <= 0) {
+                                return 'Payment Amount must be greater than 0';
+                              }
+                              return null;
+                            },
+                          ),
+                          const SizedBox(height: 16),
+                        ],
                         Row(
                           children: <Widget>[
                             const _FieldLabel(label: 'Items *'),
@@ -813,12 +1066,16 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                             line.selectedItemCode = value;
                             line.itemCodeController.text = (value ?? '').trim();
                           });
+                          unawaited(_hydrateLineRate(line, force: true));
                         },
                 )
               else
                 TextFormField(
                   controller: line.itemCodeController,
                   decoration: const InputDecoration(hintText: 'Item code'),
+                  onChanged: (_) {
+                    unawaited(_hydrateLineRate(line, force: true));
+                  },
                 ),
               const SizedBox(height: 10),
               Row(
@@ -843,14 +1100,14 @@ class _SalesInvoiceFormPageState extends ConsumerState<SalesInvoiceFormPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        const _FieldLabel(label: 'Rate'),
+                        const _FieldLabel(label: 'Item Price'),
                         TextFormField(
                           controller: line.rateController,
                           keyboardType: const TextInputType.numberWithOptions(
                             decimal: true,
                           ),
                           decoration: const InputDecoration(
-                            hintText: 'Optional',
+                            hintText: 'Auto filled from Item Price',
                           ),
                         ),
                       ],

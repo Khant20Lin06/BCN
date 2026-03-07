@@ -6,6 +6,9 @@ class SalesInvoiceEntity {
     required this.currency,
     required this.priceList,
     required this.sourceWarehouse,
+    required this.isPos,
+    required this.paymentMode,
+    required this.paymentAmount,
     required this.grandTotal,
     required this.status,
     this.items = const <SalesInvoiceLineEntity>[],
@@ -19,6 +22,9 @@ class SalesInvoiceEntity {
   final String currency;
   final String priceList;
   final String sourceWarehouse;
+  final bool isPos;
+  final String paymentMode;
+  final double? paymentAmount;
   final double grandTotal;
   final String status;
   final List<SalesInvoiceLineEntity> items;

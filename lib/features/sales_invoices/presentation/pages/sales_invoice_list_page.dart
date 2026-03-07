@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../items/presentation/widgets/search_field.dart';
@@ -129,19 +130,22 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
 
     if (state.status == SalesInvoicesStatus.error &&
         state.salesInvoices.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(state.errorMessage ?? 'Failed to load sales invoices'),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: controller.loadSalesInvoices,
-                child: const Text('Retry'),
-              ),
-            ],
+      return AppLoadErrorReporter(
+        message: state.errorMessage ?? 'Failed to load sales invoices',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(state.errorMessage ?? 'Failed to load sales invoices'),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: controller.loadSalesInvoices,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -322,12 +326,10 @@ class _SalesInvoiceListPageState extends ConsumerState<SalesInvoiceListPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failure == null ? 'Sales invoice deleted.' : failure.message,
-        ),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Sales invoice deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
   }
 }

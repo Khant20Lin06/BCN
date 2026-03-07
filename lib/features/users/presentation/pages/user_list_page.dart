@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../items/presentation/widgets/search_field.dart';
 import '../../domain/entities/user_entity.dart';
 import '../controllers/users_controller.dart';
@@ -87,19 +88,22 @@ class _UserListPageState extends ConsumerState<UserListPage> {
     }
 
     if (state.status == UsersStatus.error && state.users.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Text(state.errorMessage ?? 'Failed to load users'),
-              const SizedBox(height: 10),
-              FilledButton(
-                onPressed: controller.loadUsers,
-                child: const Text('Retry'),
-              ),
-            ],
+      return AppLoadErrorReporter(
+        message: state.errorMessage ?? 'Failed to load users',
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Text(state.errorMessage ?? 'Failed to load users'),
+                const SizedBox(height: 10),
+                FilledButton(
+                  onPressed: controller.loadUsers,
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
           ),
         ),
       );
@@ -233,11 +237,11 @@ class _UserListPageState extends ConsumerState<UserListPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(failure == null ? 'User deleted.' : failure.message),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('User deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
   }
 }
 

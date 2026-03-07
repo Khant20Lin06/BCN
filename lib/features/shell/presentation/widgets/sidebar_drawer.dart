@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../../../../app/theme/app_theme.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 
@@ -19,6 +20,7 @@ class SidebarDrawer extends ConsumerWidget {
     final String location = GoRouterState.of(context).uri.path;
     final AsyncValue<String> versionAsync = ref.watch(appVersionProvider);
     final session = ref.watch(authControllerProvider).session;
+    final BcnThemePalette palette = Theme.of(context).bcnPalette;
     final bool canReadItems = AppPermissionResolver.can(
       session,
       AppModule.items,
@@ -49,6 +51,11 @@ class SidebarDrawer extends ConsumerWidget {
       AppModule.stockBalances,
       PermissionAction.read,
     );
+    final bool canReadReports = AppPermissionResolver.can(
+      session,
+      AppModule.rolePermissions,
+      PermissionAction.read,
+    );
 
     return Drawer(
       child: SafeArea(
@@ -68,20 +75,21 @@ class SidebarDrawer extends ConsumerWidget {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primary,
+                        color: palette.navigation,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Icon(
                         Icons.inventory_2_rounded,
-                        color: Theme.of(context).colorScheme.onPrimary,
+                        color: palette.onNavigation,
                       ),
                     ),
                     const SizedBox(width: 10),
-                    const Text(
+                    Text(
                       'ERP CORE',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w900,
+                        color: palette.authHeadingColor,
                       ),
                     ),
                   ],
@@ -146,6 +154,16 @@ class SidebarDrawer extends ConsumerWidget {
                   onTap: () {
                     Navigator.pop(context);
                     context.go('/stock-balances');
+                  },
+                ),
+              if (canReadReports)
+                _NavTile(
+                  icon: Icons.palette_outlined,
+                  title: 'Theme',
+                  selected: location.startsWith('/reports/theme'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    context.go('/reports/theme');
                   },
                 ),
               const Spacer(),

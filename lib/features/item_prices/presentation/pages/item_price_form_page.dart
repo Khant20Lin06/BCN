@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../domain/entities/item_price_entity.dart';
 import '../controllers/item_prices_controller.dart';
 
@@ -198,9 +199,7 @@ class _ItemPriceFormPageState extends ConsumerState<ItemPriceFormPage> {
 
     final double? rate = double.tryParse(_rateController.text.trim());
     if (rate == null || rate < 0) {
-      setState(() {
-        _errorMessage = 'Rate must be a valid positive number.';
-      });
+      context.showAppError('Rate must be a valid positive number.');
       return;
     }
 
@@ -237,16 +236,16 @@ class _ItemPriceFormPageState extends ConsumerState<ItemPriceFormPage> {
 
     setState(() {
       _submitting = false;
-      _errorMessage = failure?.message;
     });
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
+    context.showAppSuccess(
+      widget.isEdit ? 'Item price updated.' : 'Item price created.',
+    );
     context.pop(true);
   }
 
@@ -295,12 +294,15 @@ class _ItemPriceFormPageState extends ConsumerState<ItemPriceFormPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: Text(
-                              _errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
+                          AppLoadErrorReporter(
+                            message: _errorMessage!,
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Text(
+                                _errorMessage!,
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
                               ),
                             ),
                           ),

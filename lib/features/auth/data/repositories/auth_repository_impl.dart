@@ -79,7 +79,11 @@ class AuthRepositoryImpl implements AuthRepository {
         final Failure refreshFailure = mapExceptionToFailure(refreshError);
         if (refreshFailure is UnauthorizedFailure) {
           await _localDataSource.clearSession();
-          return const Right<Failure, SessionEntity?>(null);
+          return const Left<Failure, SessionEntity?>(
+            UnauthorizedFailure(
+              message: 'Session expired. Please log in again.',
+            ),
+          );
         }
         return Right<Failure, SessionEntity?>(session);
       }

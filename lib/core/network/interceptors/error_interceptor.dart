@@ -33,6 +33,12 @@ class ErrorInterceptor extends Interceptor {
         code: code,
         statusCode: statusCode,
       );
+    } else if (statusCode == 417) {
+      appException = ValidationException(
+        message: message,
+        code: code,
+        statusCode: statusCode,
+      );
     } else if (statusCode == 404) {
       appException = NotFoundException(
         message: message,
@@ -68,9 +74,10 @@ class ErrorInterceptor extends Interceptor {
     if (normalized is String) {
       final String parsed = _extractFromExceptionText(normalized);
       if (parsed.isNotEmpty) {
-        return parsed;
+        return _sanitizeMessage(parsed);
       }
-      return normalized.trim().isEmpty ? fallback : normalized.trim();
+      final String cleaned = _sanitizeMessage(normalized);
+      return cleaned.isEmpty ? fallback : cleaned;
     }
 
     if (normalized is List<dynamic>) {
@@ -99,28 +106,28 @@ class ErrorInterceptor extends Interceptor {
             if (nested is Map<String, dynamic>) {
               final String nestedMessage = _extractMessage(nested, '');
               if (nestedMessage.isNotEmpty) {
-                return nestedMessage;
+                return _sanitizeMessage(nestedMessage);
               }
             }
             final String cleaned = _extractFromExceptionText(first);
             if (cleaned.isNotEmpty) {
-              return cleaned;
+              return _sanitizeMessage(cleaned);
             }
-            return first.trim();
+            return _sanitizeMessage(first);
           }
           if (first is Map<String, dynamic>) {
             final String nestedMessage = _extractMessage(first, '');
             if (nestedMessage.isNotEmpty) {
-              return nestedMessage;
+              return _sanitizeMessage(nestedMessage);
             }
           }
         }
       } catch (_) {
         final String cleaned = _extractFromExceptionText(serverMessages);
         if (cleaned.isNotEmpty) {
-          return cleaned;
+          return _sanitizeMessage(cleaned);
         }
-        return serverMessages.trim();
+        return _sanitizeMessage(serverMessages);
       }
     }
 
@@ -141,7 +148,7 @@ class ErrorInterceptor extends Interceptor {
 
     final String excType = (normalized['exc_type'] as String? ?? '').trim();
     if (excType.isNotEmpty) {
-      return excType;
+      return _sanitizeMessage(excType);
     }
 
     return fallback;
@@ -190,14 +197,62 @@ class ErrorInterceptor extends Interceptor {
         if (parts.length >= 2) {
           final String message = parts.sublist(1).join(':').trim();
           if (message.isNotEmpty) {
-            return message;
+            return _sanitizeMessage(message);
           }
         }
       }
       if (line.isNotEmpty) {
-        return line;
+        return _sanitizeMessage(line);
       }
     }
     return '';
+  }
+
+  String _sanitizeMessage(String value) {
+    String text = value.trim();
+    if (text.isEmpty) {
+      return '';
+    }
+
+    text = text.replaceAllMapped(
+      RegExp(r'<a\b[^>]*>(.*?)</a>', caseSensitive: false, dotAll: true),
+      (Match match) => ' ${match.group(1) ?? ''} ',
+    );
+    text = text.replaceAll(RegExp(r'<[^>]+>'), ' ');
+    text = text.replaceAll(RegExp(r'https?://[^\s"<>]+'), ' ');
+    text = text.replaceAll(RegExp(r'//[^\s"<>]+'), ' ');
+    text = text
+        .replaceAll('&quot;', '"')
+        .replaceAll('&amp;', '&')
+        .replaceAll('&lt;', '<')
+        .replaceAll('&gt;', '>')
+        .replaceAll('&nbsp;', ' ');
+    text = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+    return _normalizeLinkedMessage(text);
+  }
+
+  String _normalizeLinkedMessage(String value) {
+    final String normalized = value.trim();
+    if (normalized.isEmpty) {
+      return '';
+    }
+
+    final RegExp linkedPattern = RegExp(
+      r'([A-Za-z0-9._@/-]+)\s+is linked with\s+([A-Za-z ]+?)\s+([A-Za-z0-9._@/-]+)',
+      caseSensitive: false,
+    );
+    final RegExpMatch? linkedMatch = linkedPattern.firstMatch(normalized);
+    if (linkedMatch != null) {
+      final String source = linkedMatch.group(1)!.trim();
+      final String linkedType = linkedMatch.group(2)!.trim();
+      final String linkedId = linkedMatch.group(3)!.trim();
+      return '$source is linked with $linkedType $linkedId. Hard delete is blocked. Remove the linked record first or use Soft Delete.';
+    }
+
+    if (normalized.toLowerCase().contains('is linked with')) {
+      return '$normalized Hard delete is blocked.';
+    }
+
+    return normalized;
   }
 }

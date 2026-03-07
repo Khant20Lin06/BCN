@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../app/theme/app_theme.dart';
+import '../../../../core/feedback/app_feedback.dart';
 import '../controllers/auth_controller.dart';
 import '../widgets/bcn_logo_mark.dart';
 
@@ -17,7 +19,6 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
   late final TextEditingController _emailController;
 
   bool _submitting = false;
-  String? _inlineMessage;
 
   @override
   void initState() {
@@ -38,7 +39,6 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
     setState(() {
       _submitting = true;
-      _inlineMessage = null;
     });
 
     final result = await ref
@@ -51,22 +51,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
 
     setState(() {
       _submitting = false;
-      _inlineMessage = result.fold(
-        (failure) => failure.message,
-        (right) => right,
-      );
     });
+
+    result.fold(context.showAppFailure, context.showAppSuccess);
   }
 
   @override
   Widget build(BuildContext context) {
-    final Color background = const Color(0xFFF2F2F4);
-    final Color cardBackground = const Color(0xFFF6F6F7);
-    final Color cardBorder = const Color(0xFFC9CDD3);
-    final Color inputBorder = const Color(0xFFBFC9D8);
-
+    final palette = context.bcnPalette;
     return Scaffold(
-      backgroundColor: background,
+      backgroundColor: palette.authPageBackground,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
@@ -81,16 +75,16 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                     'Forgot Password',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w700,
-                      color: const Color(0xFF142539),
+                      color: palette.authHeadingColor,
                     ),
                   ),
                   const SizedBox(height: 24),
                   Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: cardBackground,
+                      color: palette.authCardBackground,
                       borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: cardBorder),
+                      border: Border.all(color: palette.authCardBorder),
                       boxShadow: const <BoxShadow>[
                         BoxShadow(
                           color: Color(0x14000000),
@@ -113,20 +107,20 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                   Icons.mail_outline_rounded,
                                 ),
                                 hintText: 'Enter email',
-                                hintStyle: const TextStyle(
-                                  color: Color(0xFF6C7684),
+                                hintStyle: TextStyle(
+                                  color: palette.authTextMuted,
                                   fontWeight: FontWeight.w500,
                                 ),
-                                fillColor: const Color(0xFFF4F4F6),
+                                fillColor: palette.authCardBackground,
                                 enabledBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(999),
-                                  borderSide: BorderSide(color: inputBorder),
+                                  borderSide: BorderSide(
+                                    color: palette.authInputBorder,
+                                  ),
                                 ),
                                 focusedBorder: OutlineInputBorder(
                                   borderRadius: BorderRadius.circular(999),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFF8EA5C7),
-                                  ),
+                                  borderSide: BorderSide(color: palette.button),
                                 ),
                               ),
                               validator: (String? value) {
@@ -143,8 +137,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                 onPressed: _submitting ? null : _submit,
                                 style: ElevatedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(54),
-                                  backgroundColor: const Color(0xFF11131A),
-                                  foregroundColor: Colors.white,
+                                  backgroundColor: palette.button,
+                                  foregroundColor: palette.onButton,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(999),
@@ -166,20 +160,11 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
                                     : const Text('Instructions Emailed'),
                               ),
                             ),
-                            if (_inlineMessage != null) ...<Widget>[
-                              const SizedBox(height: 10),
-                              Text(
-                                _inlineMessage!,
-                                textAlign: TextAlign.center,
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(color: const Color(0xFF5D6774)),
-                              ),
-                            ],
                             const SizedBox(height: 8),
                             TextButton(
                               onPressed: () => context.go('/login'),
                               style: TextButton.styleFrom(
-                                foregroundColor: const Color(0xFF15263A),
+                                foregroundColor: palette.authHeadingColor,
                               ),
                               child: const Text(
                                 'Back to Login',

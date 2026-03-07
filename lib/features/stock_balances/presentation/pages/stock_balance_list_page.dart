@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../../core/feedback/app_feedback.dart';
 import '../../../../core/permissions/app_permission_resolver.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../items/presentation/widgets/search_field.dart';
@@ -158,16 +159,19 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
         state.stockBalances.isEmpty) {
       return _buildScrollableMessage(
         context,
-        Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            Text(state.errorMessage ?? 'Failed to load stock balances'),
-            const SizedBox(height: 10),
-            FilledButton(
-              onPressed: controller.loadStockBalances,
-              child: const Text('Retry'),
-            ),
-          ],
+        AppLoadErrorReporter(
+          message: state.errorMessage ?? 'Failed to load stock balances',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(state.errorMessage ?? 'Failed to load stock balances'),
+              const SizedBox(height: 10),
+              FilledButton(
+                onPressed: controller.loadStockBalances,
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
         onRefresh: controller.loadStockBalances,
       );
@@ -345,13 +349,11 @@ class _StockBalanceListPageState extends ConsumerState<StockBalanceListPage> {
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          failure == null ? 'Stock balance deleted.' : failure.message,
-        ),
-      ),
-    );
+    if (failure == null) {
+      context.showAppSuccess('Stock balance deleted.');
+    } else {
+      context.showAppFailure(failure);
+    }
   }
 
   String _formatQuantity(double? value) {

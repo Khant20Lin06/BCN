@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failure.dart';
+import '../../../../core/feedback/app_feedback.dart';
 import '../controllers/item_form_controller.dart';
 import '../controllers/items_controller.dart';
 import '../state/item_form_state.dart';
@@ -143,12 +144,15 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       if (state.errorMessage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 10),
-                          child: Text(
-                            state.errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                        AppLoadErrorReporter(
+                          message: state.errorMessage!,
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: Text(
+                              state.errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ),
                         ),
@@ -330,11 +334,7 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
     if (_itemNameController.text.trim().isEmpty ||
         (_selectedItemGroup == null || _selectedItemGroup!.isEmpty) ||
         (_selectedUom == null || _selectedUom!.isEmpty)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Item Name, Item Group and UOM are required.'),
-        ),
-      );
+      context.showAppError('Item Name, Item Group and UOM are required.');
       return;
     }
 
@@ -348,26 +348,18 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
 
     if (_openingStockController.text.trim().isNotEmpty &&
         openingStock == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Opening Qty must be a valid number.')),
-      );
+      context.showAppError('Opening Qty must be a valid number.');
       return;
     }
 
     if (_valuationController.text.trim().isNotEmpty && valuation == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Valuation Rate must be a valid number.')),
-      );
+      context.showAppError('Valuation Rate must be a valid number.');
       return;
     }
 
     if (_standardRateController.text.trim().isNotEmpty &&
         standardRate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Standard Selling Price must be a valid number.'),
-        ),
-      );
+      context.showAppError('Standard Selling Price must be a valid number.');
       return;
     }
 
@@ -416,14 +408,15 @@ class _ItemFormPageState extends ConsumerState<ItemFormPage> {
     }
 
     if (failure != null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(failure.message)));
+      context.showAppFailure(failure);
       return;
     }
 
     await ref.read(itemsControllerProvider.notifier).refresh();
     if (mounted) {
+      context.showAppSuccess(
+        widget.isEdit ? 'Item updated.' : 'Item created.',
+      );
       context.pop(true);
     }
   }

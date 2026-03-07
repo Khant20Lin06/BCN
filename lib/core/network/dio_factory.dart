@@ -13,14 +13,14 @@ class DioFactory {
   Dio create({
     required String baseUrl,
     Map<String, String>? headers,
-    Duration connectTimeout = const Duration(seconds: 15),
-    Duration receiveTimeout = const Duration(seconds: 20),
+    Duration? connectTimeout,
+    Duration? receiveTimeout,
   }) {
     final Dio dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
-        connectTimeout: connectTimeout,
-        receiveTimeout: receiveTimeout,
+        connectTimeout: connectTimeout ?? const Duration(seconds: 15),
+        receiveTimeout: receiveTimeout ?? const Duration(seconds: 20),
         headers: <String, String>{'Accept': 'application/json', ...?headers},
       ),
     );
