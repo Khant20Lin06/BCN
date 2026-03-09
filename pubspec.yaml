@@ -1,7 +1,7 @@
 ﻿name: frappe_mobile_item_app
 description: "Production-grade Flutter mobile app for Frappe Item CRUD"
 publish_to: 'none'
-version: 0.0.3
+version: 0.0.4
 
 environment:
   sdk: ^3.10.8
